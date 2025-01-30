@@ -2,9 +2,9 @@
 # MIT License
 # Created Date: 2024-09-02
 # Created By: Jason Evans
-# Modified Date: 2024-10-18
+# Modified Date: 2025-01-29
 # Modified By: Jason Evans
-# Version 1.2.5
+# Version 1.2.6
 
 import tkinter as tk
 from tkinter import ttk, scrolledtext, Menu, messagebox
@@ -14,7 +14,7 @@ import json
 import sqlite3
 from datetime import datetime
 import requests
-from analytics import create_table, insert_follower, plot_follower_growth, segment_followers
+from analytics import create_table, insert_follower, plot_follower_growth, segment_followers, plot_unfollower_trend
 from dev.prototype.utils import get_all_followers, format_list
 from openai import OpenAI
 from dotenv import load_dotenv
@@ -76,7 +76,6 @@ def track_followers(username, token, followers_file):
             follower_history = {}
 
         # Step 3: Get current followers from GitHub API
-        # Fetch current followers and following lists
         followers_url = f'https://api.github.com/users/{username}/followers'
         current_followers = get_all_followers(username, token, followers_url)
 
@@ -98,15 +97,22 @@ def track_followers(username, token, followers_file):
         for follower in current_followers:
             insert_follower(conn, follower, today)
 
-        # Step 7: Update output window (with timestamp)
-        # Display follower data in the text box
+        # Step 7: Insert unfollowers into database
+        for unfollower in unfollowers:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO unfollowers (username, timestamp)
+                VALUES (?, ?)
+            ''', (unfollower, today))
+            conn.commit()
+
+        # Step 8: Update output window (with timestamp)
         follower_text.config(state=tk.NORMAL)
         follower_text.delete(1.0, tk.END)
 
-        # Add the datetime stamp at the top
         timestamp_output = f"Followers tracked on: {today}\n\n"
-        print(f"Inserting timestamp: {timestamp_output}")  # Debugging: Print timestamp to console/log
-        follower_text.insert(tk.END, timestamp_output)  # Insert timestamp at the top
+        print(f"Inserting timestamp: {timestamp_output}")  
+        follower_text.insert(tk.END, timestamp_output)  
 
         formatted_new, color_new = format_list("New followers", new_followers, "green")
         follower_text.insert(tk.END, formatted_new, "new_followers")
@@ -114,7 +120,6 @@ def track_followers(username, token, followers_file):
         formatted_unf, color_unf = format_list("Unfollowers", unfollowers, "red")
         follower_text.insert(tk.END, formatted_unf, "unfollowers")
 
-        # Add a section to display users not following you back
         formatted_not_following_back, color_not_following_back = format_list("Not following you back", not_following_back, "purple")
         follower_text.insert(tk.END, formatted_not_following_back, "not_following_back")
 
@@ -125,15 +130,16 @@ def track_followers(username, token, followers_file):
         follower_text.tag_config("unfollowers", foreground=color_unf)
         follower_text.tag_config("not_following_back", foreground=color_not_following_back)
         follower_text.tag_config("followers_back", foreground=color_back)
-        
+
         follower_text.config(state=tk.DISABLED)
 
-        # Step 8: Save current followers to the file
-        # Save updated data to file
+        # Step 9: Save updated data to file
         with open(followers_file, 'w') as f:
             json.dump({'followers': current_followers, 'history': follower_history}, f, indent=4)
 
+        # ✅ Enable buttons after tracking completes successfully
         show_analytics_button.config(state=tk.NORMAL)
+        show_unfollower_trend_button.config(state=tk.NORMAL)
         segment_followers_button.config(state=tk.NORMAL)
         summary_button.config(state=tk.NORMAL)
 
@@ -142,6 +148,15 @@ def track_followers(username, token, followers_file):
     except Exception as e:
         messagebox.showerror("Error", str(e))
     switch_tab(notebook, 0)  # Switch to "Followers" tab after generating summary
+
+    # Insert unfollowers into database
+    for unfollower in unfollowers:
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO unfollowers (username, timestamp)
+            VALUES (?, ?)
+        ''', (unfollower, today))
+        conn.commit()
 
 # Function to start tracking in a separate thread
 def start_tracking():
@@ -319,6 +334,15 @@ def set_theme(theme):
         style.configure('TLabel', background="default_color_bg", foreground="default_color_fg")
         follower_text.configure(bg="default_color_bg", fg="default_color_fg")
 
+def show_unfollowers():
+    try:
+        conn = sqlite3.connect('follower_data.db')
+        plot_unfollower_trend(conn)
+        conn.close()
+    except Exception as e:
+        messagebox.showerror("Error", str(e))
+    switch_tab(notebook, 0)
+
 # GUI setup
 root = tk.Tk()
 root.title("GitHub Follower Checker")
@@ -396,8 +420,12 @@ track_button = tk.Button(left_column, text="Track Followers", command=start_trac
 track_button.pack(anchor="w", pady=5)
 
 # Show analytics button
-show_analytics_button = tk.Button(left_column, text="Show Analytics", command=show_analytics, state=tk.DISABLED)
+show_analytics_button = tk.Button(left_column, text="Show Follower Trends", command=show_analytics, state=tk.DISABLED)
 show_analytics_button.pack(anchor="w", pady=5)
+
+# Show unfollower trends button
+show_unfollower_trend_button = tk.Button(left_column, text="Show Unfollower Trends", command=show_unfollowers, state=tk.DISABLED)
+show_unfollower_trend_button.pack(anchor="w", pady=5)
 
 # Create the segmentation type variable with a default read-only label "Please Select"
 segmentation_type_var = tk.StringVar(value="Please Select")
