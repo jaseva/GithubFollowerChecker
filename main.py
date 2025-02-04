@@ -64,6 +64,7 @@ def track_followers(username, token, followers_file):
         # Step 1: Establish connection to database
         conn = sqlite3.connect('follower_data.db')
         create_table(conn)
+        cursor = conn.cursor()  # ✅ Create cursor at the start
 
         # Step 2: Load previous follower data if exists
         if os.path.exists(followers_file):
@@ -97,9 +98,8 @@ def track_followers(username, token, followers_file):
         for follower in current_followers:
             insert_follower(conn, follower, today)
 
-        # Step 7: Insert unfollowers into database
+        # ✅ Step 7: Insert unfollowers into database (Ensure `conn` is not closed early)
         for unfollower in unfollowers:
-            cursor = conn.cursor()
             cursor.execute('''
                 INSERT INTO unfollowers (username, timestamp)
                 VALUES (?, ?)
@@ -143,11 +143,15 @@ def track_followers(username, token, followers_file):
         segment_followers_button.config(state=tk.NORMAL)
         summary_button.config(state=tk.NORMAL)
 
-        conn.close()
-
     except Exception as e:
         messagebox.showerror("Error", str(e))
+
+    finally:
+        if conn:
+            conn.close()  # ✅ Ensure database connection is always closed safely
+
     switch_tab(notebook, 0)  # Switch to "Followers" tab after generating summary
+
 
     # Insert unfollowers into database
     for unfollower in unfollowers:
