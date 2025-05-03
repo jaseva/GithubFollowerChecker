@@ -1,0 +1,5 @@
+fastapi
+uvicorn[standard]
+httpx          # async HTTP calls (GitHub API)
+python-dotenv
+pydantic[email]

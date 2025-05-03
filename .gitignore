@@ -5,3 +5,44 @@
 /python
 follower_data.db
 test.txt
+
+# Root Python backend
+backend/__pycache__/
+backend/**/*.pyc
+backend/**/*.pyo
+backend/**/*.pyd
+backend/.mypy_cache/
+backend/.pytest_cache/
+backend/.venv/
+backend/venv/
+backend/env/
+backend/.env
+backend/.env.*
+
+# SQLite DB (if stored locally)
+*.sqlite3
+*.db
+
+# Frontend Node project
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.env.local
+frontend/.env*
+
+# System files
+.DS_Store
+Thumbs.db
+*.log
+*.bak
+
+# VSCode + IDE configs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Mac/Linux & Windows generated
+*.~*
+*.tmp
+
