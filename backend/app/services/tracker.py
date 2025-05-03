@@ -1,61 +1,61 @@
-# backend/app/services/tracker.py
-
-import sqlite3
-from datetime import datetime, timedelta
-
 import os
+import sqlite3
+import requests
 from datetime import datetime
 
-DB_PATH = "follower_data.db"
+# We'll write everything into this file (auto-created if missing)
+DB_PATH = os.path.join(os.path.dirname(__file__), "followers.db")
 
-def track_followers_job(username: str, token: str, db_path: str = DB_PATH):
+def fetch_total_followers(username: str, token: str) -> int:
+    headers = {"Authorization": f"token {token}"}
+    r = requests.get(f"https://api.github.com/users/{username}", headers=headers)
+    r.raise_for_status()
+    return r.json().get("followers", 0)
+
+def track_followers_paginated_job(username: str, token: str):
     """
-    Wrapper around existing track_followers logic that just
-    fetches followers and writes to the database (no UI).
+    Every run, page through GitHub's /users/{username}/followers
+    (100 per page), collect all IDs, then INSERT or IGNORE them
+    into our `followers` table with the current timestamp.
     """
-    from app.services.tracker import create_table, insert_follower  # etc.
+    all_ids = []
+    page = 1
+    headers = {"Authorization": f"token {token}"}
 
-    # existing logic: fetch current_followers, compute unfollowers, write to DB
-    # but in CLI context: skip UI parts and just write to SQLite.
-    # You can copy-paste your track_followers() core, minus tkinter.
+    while True:
+        resp = requests.get(
+            f"https://api.github.com/users/{username}/followers",
+            params={"per_page": 100, "page": page},
+            headers=headers,
+        )
+        resp.raise_for_status()
+        batch = resp.json()
+        if not batch:
+            break
 
-def get_follower_stats(db_path: str = DB_PATH):
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
+        # collect each follower's unique GitHub numeric ID
+        all_ids.extend(user["id"] for user in batch)
+        page += 1
 
-    # Total followers (latest timestamp)
-    cursor.execute("""
-      SELECT COUNT(DISTINCT username)
-      FROM followers
-      WHERE timestamp = (
-        SELECT MAX(timestamp) FROM followers
-      )
+    # Persist into SQLite
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+
+    # Create table if it's the first run
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS followers (
+        follower_id INTEGER PRIMARY KEY,
+        timestamp TEXT NOT NULL
+    )
     """)
-    total = cursor.fetchone()[0] or 0
 
-    # Followers 24h ago (approx)
-    yesterday = (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%d")
-    cursor.execute("""
-      SELECT COUNT(DISTINCT username)
-      FROM followers
-      WHERE DATE(timestamp) = ?
-    """, (yesterday,))
-    then = cursor.fetchone()[0] or 0
+    now = datetime.utcnow().isoformat()
+    for fid in all_ids:
+        # only insert new ones; ignore ones we already have
+        cur.execute(
+            "INSERT OR IGNORE INTO followers (follower_id, timestamp) VALUES (?, ?)",
+            (fid, now),
+        )
 
-    # New in last 24h
-    new = total - then
-
-    # Unfollowers in last 24h
-    cursor.execute("""
-      SELECT COUNT(DISTINCT username)
-      FROM unfollowers
-      WHERE DATE(timestamp) = ?
-    """, (yesterday,))
-    unfollowers = cursor.fetchone()[0] or 0
-
+    conn.commit()
     conn.close()
-    return {
-        "total_followers": total,
-        "new_followers": new if new > 0 else 0,
-        "unfollowers": unfollowers,
-    }

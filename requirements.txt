@@ -1,10 +1,15 @@
 ## requirements.txt
 ## MIT License
 ## Created Date: 2024-09-01
-## Version 1.1
+## Updated Date: 2025-05-03
+## Version 1.2
 
 requests
 matplotlib
 tkinter
 openai
 python-dotenv
+fastapi
+uvicorn
+pydantic
+apscheduler

@@ -1,6 +1,23 @@
-export async function getPing() {
-    const res = await fetch("http://localhost:8000/stats/ping");
+export interface Stats {
+    total_followers: number;
+    new_followers: number;
+    unfollowers: number;
+  }
+  
+  export async function getPing(): Promise<{ status: string }> {
+    const res = await fetch("http://localhost:8000/ping");
     if (!res.ok) throw new Error("Network error");
-    return res.json() as Promise<{ status: string; time: string }>;
+    return res.json();
+  }
+  
+  export async function getFollowerStats(): Promise<Stats> {
+    const res = await fetch("http://localhost:8000/stats/followers", {
+      credentials: "include",
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`Failed to load stats: ${res.status} ${body}`);
+    }
+    return res.json();
   }
   
