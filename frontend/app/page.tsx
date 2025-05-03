@@ -9,7 +9,7 @@ import {
   CardTitle,
   CardContent,
 } from "@/components/ui/card";
-import { getPing, getFollowerStats, type Stats } from "@/lib/api";
+import { getPing, getFollowerStats, Stats } from "@/lib/api";
 
 export default function Home() {
   const { data: session, status } = useSession();
@@ -30,16 +30,13 @@ export default function Home() {
     if (status === "authenticated") {
       getFollowerStats()
         .then(setStats)
-        .catch((err) => {
-          console.error(err);
-          setError("Failed to load follower stats");
-        });
+        .catch(() => setError("Failed to load follower stats"));
     }
   }, [status]);
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center p-8 space-y-8">
-      <div className="text-center space-y-2">
+    <main className="min-h-screen flex flex-col items-center justify-center p-8 text-center space-y-8">
+      <div className="space-y-2">
         <h1 className="text-4xl font-bold">GitHub Follower Checker</h1>
         <p className="text-muted-foreground">
           Track and analyze your followers with AI and data insights.
@@ -61,6 +58,7 @@ export default function Home() {
             </strong>
           </p>
 
+          {/* ping backend */}
           <div className="space-y-2">
             <Button onClick={loadPing}>Ping backend</Button>
             {ping && (
