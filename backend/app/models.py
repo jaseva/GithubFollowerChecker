@@ -1,7 +1,5 @@
-# app/models.py
-
 from pydantic import BaseModel
-from datetime import datetime
+from typing import List
 
 class Stats(BaseModel):
     total_followers: int
@@ -9,5 +7,11 @@ class Stats(BaseModel):
     unfollowers: int
 
 class FollowerSnapshot(BaseModel):
-    timestamp: datetime
+    timestamp: str
     total_followers: int
+
+class ChangeEntry(BaseModel):
+    login: str
+    avatar_url: str
+    html_url: str
+    timestamp: str

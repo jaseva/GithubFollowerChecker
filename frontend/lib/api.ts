@@ -1,5 +1,4 @@
 // frontend/lib/api.ts
-
 export type Stats = {
     total_followers: number
     new_followers: number
@@ -11,33 +10,44 @@ export type Stats = {
     total_followers: number
   }
   
-  const API_BASE = "http://localhost:8000"
+  export type ChangeEntry = {
+    login: string
+    avatar_url: string
+    html_url: string
+    timestamp: string
+  }
+  
+  const BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
+  
+  async function fetchJson<T>(path: string): Promise<T> {
+    const res = await fetch(`${BASE}${path}`, {
+      credentials: "include",
+    })
+    if (!res.ok) {
+      const body = await res.text().catch(() => "")
+      throw new Error(`Failed to load ${path}: ${res.status} ${body}`)
+    }
+    return res.json()
+  }
   
   export async function getPing(): Promise<{ status: string }> {
-    const res = await fetch(`${API_BASE}/ping`)
-    if (!res.ok) throw new Error("Network error")
-    return res.json()
+    return fetchJson("/ping")
   }
   
   export async function getFollowerStats(): Promise<Stats> {
-    const res = await fetch(`${API_BASE}/stats/followers`, {
-      credentials: "include",
-    })
-    if (!res.ok) {
-      const txt = await res.text().catch(() => "")
-      throw new Error(`Failed to load stats: ${res.status} ${txt}`)
-    }
-    return res.json()
+    return fetchJson("/stats/followers")
   }
   
   export async function getFollowerTrends(): Promise<FollowerSnapshot[]> {
-    const res = await fetch(`${API_BASE}/stats/trends`, {
-      credentials: "include",
-    })
-    if (!res.ok) {
-      const txt = await res.text().catch(() => "")
-      throw new Error(`Failed to load trends: ${res.status} ${txt}`)
-    }
-    return res.json()
+    return fetchJson("/stats/trends")
+  }
+  
+  /**
+   * Fetch the list of either "new" or "lost" followers
+   */
+  export async function getChangeHistory(
+    type: "new" | "lost"
+  ): Promise<ChangeEntry[]> {
+    return fetchJson(`/stats/${type}`)
   }
   
