@@ -1,34 +1,24 @@
-// frontend/lib/api.ts
+export interface Stats { total_followers: number; new_followers: number; unfollowers: number; }
+export interface Trends { labels: string[]; history: number[]; }
+export interface Change { username: string; timestamp: string; }
 
-export type Stats = {
-    total_followers: number;
-    new_followers: number;
-    unfollowers: number;
-  };
-  
-  export type ChangeRecord = {
-    timestamp: string;
-    new?: number;
-    lost?: number;
-    count: number;
-  };
-  
-  const BASE = "http://localhost:8000";
-  
-  async function handleFetch(path: string) {
-    const res = await fetch(BASE + path, { credentials: "include" });
-    if (!res.ok) {
-      const txt = await res.text().catch(() => "");
-      throw new Error(`Failed ${path}: ${res.status} ${txt}`);
-    }
-    return res.json();
+async function fetchJSON<T>(url: string): Promise<T> {
+  const res = await fetch(url, { credentials: "include" });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Failed to load ${url}: ${res.status} ${body}`);
   }
-  
-  export function getFollowerStats(): Promise<Stats> {
-    return handleFetch("/stats/followers");
-  }
-  
-  export function getChangeHistory(kind: "new" | "lost"): Promise<ChangeRecord[]> {
-    return handleFetch(`/stats/${kind}`).then((body) => body.history);
-  }
-  
+  return res.json();
+}
+
+export function getFollowerStats(): Promise<Stats> {
+  return fetchJSON<Stats>("http://localhost:8000/stats/followers");
+}
+
+export function getFollowerTrends(): Promise<Trends> {
+  return fetchJSON<Trends>("http://localhost:8000/stats/trends");
+}
+
+export function getChangeHistory(type: "new"|"lost"): Promise<Change[]> {
+  return fetchJSON<Change[]>(`http://localhost:8000/stats/history/${type}`);
+}

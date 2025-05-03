@@ -1,77 +1,79 @@
-# backend/app/services/tracker.py
-
 import os
 import sqlite3
+import requests
 from datetime import datetime, timedelta
-from typing import List, Literal, Dict
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "followers.db")
+# bring in your Pydantic models for type annotations
+from app.models import Stats, Trends, Change
 
-def get_db_connection():
-    return sqlite3.connect(DB_PATH)
+# path to your SQLite DB
+DB_PATH = os.path.join(os.path.dirname(__file__), "../followers.db")
 
-def get_follower_stats() -> Dict[str, int]:
-    """
-    Returns {"total_followers": int, "new_followers": int, "unfollowers": int}
-    """
-    conn = get_db_connection()
-    cur = conn.cursor()
+API_URL = "https://api.github.com"
+USERNAME = os.getenv("GITHUB_USERNAME")
+TOKEN    = os.getenv("GITHUB_TOKEN")
+HEADERS  = {"Authorization": f"token {TOKEN}"}
 
-    # latest snapshot
-    cur.execute("SELECT count FROM followers ORDER BY timestamp DESC LIMIT 1")
-    row = cur.fetchone()
-    total = row[0] if row else 0
+def get_follower_stats() -> Stats:
+    # 1) fetch the current follower count from GitHub
+    r = requests.get(f"{API_URL}/users/{USERNAME}", headers=HEADERS)
+    r.raise_for_status()
+    total = r.json()["followers"]
 
-    # 24h ago snapshot
-    cutoff = datetime.utcnow() - timedelta(days=1)
-    cur.execute(
-        "SELECT count FROM followers WHERE timestamp <= ? ORDER BY timestamp DESC LIMIT 1",
-        (cutoff.timestamp(),)
+    # 2) open DB, append snapshot
+    now = datetime.utcnow()
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute(
+        "INSERT INTO followers (count, timestamp) VALUES (?, ?)",
+        (total, now.isoformat()),
     )
-    row = cur.fetchone()
-    previous = row[0] if row else total
+    conn.commit()
 
-    new = max(0, total - previous)
-    lost = max(0, previous - total)
-
+    # 3) compute changes over the last 24h
+    since = (now - timedelta(days=1)).isoformat()
+    c.execute("SELECT count FROM followers WHERE timestamp >= ?", (since,))
+    rows = [r[0] for r in c.fetchall()]
     conn.close()
-    return {
-        "total_followers": total,
-        "new_followers": new,
-        "unfollowers": lost,
-    }
 
-def get_change_history(kind: Literal["new", "lost"]) -> List[Dict]:
-    """
-    Returns a list of records for the last 7 days:
-    [
-      {"timestamp": ISO8601, kind: int, "count": int},
-      ...
+    if rows:
+        delta = total - rows[0]
+        new   = delta if delta > 0 else 0
+        lost  = -delta if delta < 0 else 0
+    else:
+        new, lost = 0, 0
+
+    return Stats(
+        total_followers=total,
+        new_followers=new,
+        unfollowers=lost,
+    )
+
+def get_follower_trends() -> Trends:
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT timestamp, count FROM followers ORDER BY timestamp")
+    rows = c.fetchall()
+    conn.close()
+
+    labels  = [datetime.fromisoformat(r[0]) for r in rows]
+    history = [r[1] for r in rows]
+    return Trends(labels=labels, history=history)
+
+def get_change_history(change_type: str) -> list[Change]:
+    table = "new_followers" if change_type == "new" else "lost_followers"
+    since = (datetime.utcnow() - timedelta(days=1)).isoformat()
+
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute(
+        f"SELECT username, timestamp FROM {table} WHERE timestamp >= ?",
+        (since,),
+    )
+    rows = c.fetchall()
+    conn.close()
+
+    return [
+        Change(username=r[0], timestamp=datetime.fromisoformat(r[1]))
+        for r in rows
     ]
-    """
-    conn = get_db_connection()
-    cur = conn.cursor()
-
-    since = datetime.utcnow() - timedelta(days=7)
-    cur.execute(
-        "SELECT timestamp, count FROM followers WHERE timestamp >= ? ORDER BY timestamp",
-        (since.timestamp(),)
-    )
-    rows = cur.fetchall()
-    history = []
-    prev_count = None
-
-    for ts, cnt in rows:
-        dt = datetime.utcfromtimestamp(ts).isoformat()
-        if prev_count is None:
-            delta = 0
-        else:
-            if kind == "new":
-                delta = max(0, cnt - prev_count)
-            else:
-                delta = max(0, prev_count - cnt)
-        history.append({"timestamp": dt, kind: delta, "count": cnt})
-        prev_count = cnt
-
-    conn.close()
-    return history

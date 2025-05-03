@@ -1,17 +1,15 @@
 from pydantic import BaseModel
-from typing import List
+from datetime import datetime
 
 class Stats(BaseModel):
     total_followers: int
     new_followers: int
     unfollowers: int
 
-class FollowerSnapshot(BaseModel):
-    timestamp: str
-    total_followers: int
+class Trends(BaseModel):
+    labels: list[datetime]
+    history: list[int]
 
-class ChangeEntry(BaseModel):
-    login: str
-    avatar_url: str
-    html_url: str
-    timestamp: str
+class Change(BaseModel):
+    username: str
+    timestamp: datetime

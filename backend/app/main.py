@@ -1,23 +1,20 @@
-# backend/app/main.py
-
-import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
+import os
 
-from app.api.ping import router as ping_router
-from app.api.stats import router as stats_router
+# 1) load .env (if you went that route)
+load_dotenv()
 
+# 2) pull in your GitHub credentials
 GITHUB_USERNAME = os.getenv("GITHUB_USERNAME")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 if not GITHUB_USERNAME or not GITHUB_TOKEN:
     raise RuntimeError("GITHUB_USERNAME and GITHUB_TOKEN must be set in env")
 
-app = FastAPI(
-    title="GitHub Follower Checker API",
-    version="0.1.0",
-)
+app = FastAPI(title="GitHub Follower Checker API")
 
-# Allow our Next.js front-end on localhost:3000
+# allow Next.js on localhost:3000 to talk to us
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],
@@ -26,5 +23,5 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(ping_router)
+from app.api.stats import router as stats_router
 app.include_router(stats_router)

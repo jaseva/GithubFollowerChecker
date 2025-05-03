@@ -1,23 +1,13 @@
-"use client"
-
-import { useSession, signIn, signOut } from "next-auth/react"
-import { useEffect, useState } from "react"
-import { Button } from "@/components/ui/button"
+"use client";
+import { useEffect, useState } from "react";
 import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-} from "@/components/ui/card"
-import {
-  getPing,
   getFollowerStats,
   getFollowerTrends,
   getChangeHistory,
-  type Stats,
-  type FollowerSnapshot,
-  type ChangeEntry,
-} from "@/lib/api"
+  Stats,
+  Trends,
+  Change,
+} from "../lib/api";
 import {
   LineChart,
   Line,
@@ -25,218 +15,65 @@ import {
   YAxis,
   Tooltip,
   ResponsiveContainer,
-} from "recharts"
+} from "recharts";
 
 export default function Home() {
-  const { data: session, status } = useSession()
-
-  const [ping, setPing] = useState<string | null>(null)
-  const [stats, setStats] = useState<Stats | null>(null)
-  const [trends, setTrends] = useState<FollowerSnapshot[]>([])
-  const [newList, setNewList] = useState<ChangeEntry[]>([])
-  const [lostList, setLostList] = useState<ChangeEntry[]>([])
-  const [error, setError] = useState<string | null>(null)
-
-  async function loadPing() {
-    try {
-      const data = await getPing()
-      setPing(data.status)
-    } catch {
-      setPing("backend unavailable")
-    }
-  }
+  const [stats, setStats] = useState<Stats>({ total_followers: 0, new_followers: 0, unfollowers: 0 });
+  const [trends, setTrends] = useState<Trends>({ labels: [], history: [] });
+  const [newList, setNewList] = useState<Change[]>([]);
+  const [lostList, setLostList] = useState<Change[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (status === "authenticated") {
-      getFollowerStats()
-        .then(setStats)
-        .catch(() => setError("Failed to load snapshot"))
-      getFollowerTrends()
-        .then(setTrends)
-        .catch(() => setError("Failed to load trends"))
-      getChangeHistory("new")
-        .then(setNewList)
-        .catch(() => setError("Failed to load new followers"))
-      getChangeHistory("lost")
-        .then(setLostList)
-        .catch(() => setError("Failed to load lost followers"))
-    }
-  }, [status])
+    getFollowerStats()
+      .then(setStats)
+      .catch(() => setError("Failed to load snapshot"))
+      .finally(() => {
+        getFollowerTrends().then(setTrends).catch(() => setError("Failed to load trends"));
+        getChangeHistory("new").then(setNewList).catch(() => setError("Failed to load new followers"));
+        getChangeHistory("lost").then(setLostList).catch(() => setError("Failed to load lost followers"));
+      });
+  }, []);
 
-  if (status === "loading") return <p>Loading session…</p>
+  const data = trends.labels.map((ts, i) => ({
+    date: new Date(ts).toLocaleDateString(),
+    count: trends.history[i],
+  }));
 
   return (
-    <main className="min-h-screen p-8 space-y-8">
-      <header className="text-center space-y-2">
-        <h1 className="text-4xl font-bold">GitHub Follower Dashboard</h1>
-        <p className="text-muted-foreground">
-          Interactive insights on your follower growth.
-        </p>
-      </header>
+    <main className="p-8 space-y-4">
+      <h1 className="text-3xl font-bold">GitHub Follower Dashboard</h1>
+      <p className="text-gray-600">Interactive insights on your follower growth.</p>
 
-      {!session && (
-        <Button onClick={() => signIn("github")}>
-          Sign in with GitHub
-        </Button>
-      )}
+      {error && <p className="text-red-600">{error}</p>}
 
-      {session && (
-        <section className="max-w-4xl mx-auto space-y-6">
-          <div className="flex justify-between items-center">
-            <p>
-              Signed in as{" "}
-              <strong>
-                {session.user?.name || session.user?.email}
-              </strong>
-            </p>
-            <Button variant="destructive" onClick={() => signOut()}>
-              Sign out
-            </Button>
-          </div>
+      <div className="grid grid-cols-3 gap-4">
+        <div className="card">Total Followers<br/><span className="text-2xl">{stats.total_followers}</span></div>
+        <div className="card">New (24h)<br/><span className="text-green-600">+{stats.new_followers}</span></div>
+        <div className="card">Lost (24h)<br/><span className="text-red-600">-{stats.unfollowers}</span></div>
+      </div>
 
-          {/* Ping */}
-          <div className="space-y-2">
-            <Button onClick={loadPing}>Ping backend</Button>
-            {ping && (
-              <p className="text-sm text-muted-foreground">Server: {ping}</p>
-            )}
-          </div>
+      <div className="card h-64">
+        <ResponsiveContainer>
+          <LineChart data={data}>
+            <XAxis dataKey="date" />
+            <YAxis />
+            <Tooltip />
+            <Line type="monotone" dataKey="count" stroke="#4F46E5" strokeWidth={2} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
-
-          {/* KPI cards */}
-          {stats && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Total Followers</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <span className="text-3xl">{stats.total_followers}</span>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader>
-                  <CardTitle>New (24h)</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <span className="text-2xl text-green-600">
-                    +{stats.new_followers}
-                  </span>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader>
-                  <CardTitle>Lost (24h)</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <span className="text-2xl text-red-600">
-                    -{stats.unfollowers}
-                  </span>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {/* Trend chart */}
-          {trends.length > 0 && (
-            <Card className="mt-6">
-              <CardHeader>
-                <CardTitle>Follower Growth</CardTitle>
-              </CardHeader>
-              <CardContent style={{ height: 300 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={trends}>
-                    <XAxis
-                      dataKey="timestamp"
-                      tickFormatter={(t) =>
-                        new Date(t).toLocaleDateString()
-                      }
-                    />
-                    <YAxis />
-                    <Tooltip
-                      labelFormatter={(t) => new Date(t).toLocaleString()}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="total_followers"
-                      stroke="#8884d8"
-                      dot={false}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* New vs Lost lists */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>New Followers</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 max-h-64 overflow-y-auto">
-                {newList.length === 0 && <p className="text-sm">None</p>}
-                {newList.map((u) => (
-                  <div
-                    key={u.login}
-                    className="flex items-center space-x-3 py-2"
-                  >
-                    <img
-                      src={u.avatar_url}
-                      alt={u.login}
-                      className="w-8 h-8 rounded-full"
-                    />
-                    <a
-                      href={u.html_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="font-medium hover:underline"
-                    >
-                      {u.login}
-                    </a>
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(u.timestamp).toLocaleTimeString()}
-                    </span>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Lost Followers</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 max-h-64 overflow-y-auto">
-                {lostList.length === 0 && <p className="text-sm">None</p>}
-                {lostList.map((u) => (
-                  <div
-                    key={u.login}
-                    className="flex items-center space-x-3 py-2"
-                  >
-                    <img
-                      src={u.avatar_url}
-                      alt={u.login}
-                      className="w-8 h-8 rounded-full"
-                    />
-                    <a
-                      href={u.html_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="font-medium hover:underline"
-                    >
-                      {u.login}
-                    </a>
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(u.timestamp).toLocaleTimeString()}
-                    </span>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        </section>
-      )}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="card">
+          <h3>New Followers</h3>
+          {newList.length > 0 ? newList.map(c => <p key={c.username}>{c.username}</p>) : <p>None</p>}
+        </div>
+        <div className="card">
+          <h3>Lost Followers</h3>
+          {lostList.length > 0 ? lostList.map(c => <p key={c.username}>{c.username}</p>) : <p>None</p>}
+        </div>
+      </div>
     </main>
-)
+  );
 }
