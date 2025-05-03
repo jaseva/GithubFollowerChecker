@@ -1,28 +1,43 @@
-"use client";
+"use client"
 
-import { useSession, signIn, signOut } from "next-auth/react";
-import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { useSession, signIn, signOut } from "next-auth/react"
+import { useEffect, useState } from "react"
+import { Button } from "@/components/ui/button"
 import {
   Card,
   CardHeader,
   CardTitle,
   CardContent,
-} from "@/components/ui/card";
-import { getPing, getFollowerStats, Stats } from "@/lib/api";
+} from "@/components/ui/card"
+import {
+  getPing,
+  getFollowerStats,
+  getFollowerTrends,
+  type Stats,
+  type FollowerSnapshot,
+} from "@/lib/api"
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts"
 
 export default function Home() {
-  const { data: session, status } = useSession();
-  const [ping, setPing] = useState<string | null>(null);
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { data: session, status } = useSession()
+  const [ping, setPing] = useState<string | null>(null)
+  const [stats, setStats] = useState<Stats | null>(null)
+  const [trends, setTrends] = useState<FollowerSnapshot[]>([])
+  const [error, setError] = useState<string | null>(null)
 
   async function loadPing() {
     try {
-      const data = await getPing();
-      setPing(data.status);
+      const data = await getPing()
+      setPing(data.status)
     } catch {
-      setPing("backend unavailable");
+      setPing("backend unavailable")
     }
   }
 
@@ -30,92 +45,88 @@ export default function Home() {
     if (status === "authenticated") {
       getFollowerStats()
         .then(setStats)
-        .catch(() => setError("Failed to load follower stats"));
+        .catch(() => setError("Failed to load snapshot"))
+
+      getFollowerTrends()
+        .then(setTrends)
+        .catch(() => setError("Failed to load trend data"))
     }
-  }, [status]);
+  }, [status])
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center p-8 text-center space-y-8">
-      <div className="space-y-2">
-        <h1 className="text-4xl font-bold">GitHub Follower Checker</h1>
+    <main className="min-h-screen p-8 space-y-8">
+      <header className="text-center space-y-2">
+        <h1 className="text-4xl font-bold">GitHub Follower Dashboard</h1>
         <p className="text-muted-foreground">
-          Track and analyze your followers with AI and data insights.
+          Interactive insights on your follower growth.
         </p>
-      </div>
+      </header>
 
-      {status === "loading" ? (
-        <p>Loading session…</p>
-      ) : !session ? (
+      {status === "loading" && <p>Loading session…</p>}
+      {status !== "authenticated" && (
         <Button onClick={() => signIn("github")}>
           Sign in with GitHub
         </Button>
-      ) : (
-        <div className="space-y-6 max-w-md w-full">
-          <p className="text-lg">
-            Signed in as{" "}
-            <strong>
-              {session.user?.name ?? session.user?.email}
-            </strong>
-          </p>
+      )}
 
-          {/* ping backend */}
-          <div className="space-y-2">
-            <Button onClick={loadPing}>Ping backend</Button>
-            {ping && (
-              <p className="text-sm text-muted-foreground">
-                Server status: {ping}
-              </p>
-            )}
+      {status === "authenticated" && (
+        <section className="max-w-4xl mx-auto space-y-6">
+          <div className="flex justify-between items-center">
+            <p>
+              Signed in as{" "}
+              <strong>
+                {session.user?.name ?? session.user?.email}
+              </strong>
+            </p>
+            <Button variant="destructive" onClick={() => signOut()}>
+              Sign out
+            </Button>
           </div>
 
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
+          {/* Ping */}
+          <div className="space-y-2">
+            <Button onClick={loadPing}>Ping backend</Button>
+            {ping && <p className="text-sm text-muted-foreground">Server: {ping}</p>}
+          </div>
+
+          {error && <p className="text-sm text-red-600">{error}</p>}
+
+          {/* KPI cards */}
+          {stats && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Card>
+                <CardHeader><CardTitle>Total Followers</CardTitle></CardHeader>
+                <CardContent><span className="text-3xl">{stats.total_followers}</span></CardContent>
+              </Card>
+              <Card>
+                <CardHeader><CardTitle>New (24h)</CardTitle></CardHeader>
+                <CardContent><span className="text-2xl text-green-600">+{stats.new_followers}</span></CardContent>
+              </Card>
+              <Card>
+                <CardHeader><CardTitle>Lost (24h)</CardTitle></CardHeader>
+                <CardContent><span className="text-2xl text-red-600">-{stats.unfollowers}</span></CardContent>
+              </Card>
+            </div>
           )}
 
-          {stats && (
-            <Card className="w-full">
-              <CardHeader>
-                <CardTitle>Follower Snapshot</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <span className="text-2xl font-semibold">
-                    {stats.total_followers}
-                  </span>
-                  <p className="text-sm text-muted-foreground">
-                    Total Followers
-                  </p>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <div>
-                    <span className="text-lg font-semibold text-green-600">
-                      +{stats.new_followers}
-                    </span>
-                    <p className="text-sm text-muted-foreground">
-                      New (24h)
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-lg font-semibold text-red-600">
-                      –{stats.unfollowers}
-                    </span>
-                    <p className="text-sm text-muted-foreground">
-                      Unfollowers
-                    </p>
-                  </div>
-                </div>
+          {/* Trend chart */}
+          {trends.length > 0 && (
+            <Card className="mt-6">
+              <CardHeader><CardTitle>Follower Growth (Last Snapshots)</CardTitle></CardHeader>
+              <CardContent style={{ height: 300 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={trends}>
+                    <XAxis dataKey="timestamp" tickFormatter={(ts) => new Date(ts).toLocaleDateString()} />
+                    <YAxis />
+                    <Tooltip labelFormatter={(ts) => new Date(ts).toLocaleString()} />
+                    <Line type="monotone" dataKey="total_followers" stroke="#8884d8" dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
               </CardContent>
             </Card>
           )}
-
-          <Button
-            variant="destructive"
-            onClick={() => signOut()}
-          >
-            Sign out
-          </Button>
-        </div>
+        </section>
       )}
     </main>
-  );
+  )
 }
