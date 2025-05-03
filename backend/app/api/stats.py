@@ -1,26 +1,29 @@
-from typing import List
-from fastapi import APIRouter
-from app.models import Stats, FollowerSnapshot, ChangeEntry
-from app.services.tracker import (
-    get_follower_stats,
-    get_follower_trends,
-    get_change_history,
-)
+# backend/app/api/stats.py
 
-router = APIRouter()
+from fastapi import APIRouter, HTTPException
+from app.services.tracker import get_follower_stats, get_change_history
 
-@router.get("/followers", response_model=Stats)
-def followers():
-    return get_follower_stats()
+router = APIRouter(prefix="/stats", tags=["stats"])
 
-@router.get("/trends", response_model=List[FollowerSnapshot])
-def trends():
-    return get_follower_trends()
+@router.get("/followers")
+async def followers():
+    try:
+        return get_follower_stats()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/new", response_model=List[ChangeEntry])
-def new_followers():
-    return get_change_history("new")
+@router.get("/new")
+async def new_followers():
+    try:
+        # returns List[{"timestamp": "...", "new": X, "count": Y}, ...]
+        return {"history": get_change_history("new")}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/lost", response_model=List[ChangeEntry])
-def lost_followers():
-    return get_change_history("lost")
+@router.get("/lost")
+async def lost_followers():
+    try:
+        # returns List[{"timestamp": "...", "lost": X, "count": Y}, ...]
+        return {"history": get_change_history("lost")}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
