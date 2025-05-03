@@ -14,3 +14,5 @@ app.add_middleware(CORSMiddleware,
 @app.get("/ping")
 async def ping():
     return {"status": "ok"}
+
+app.include_router(stats.router)
