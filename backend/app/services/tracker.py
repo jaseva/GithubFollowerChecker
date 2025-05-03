@@ -1,5 +1,6 @@
 import os
 import sqlite3
+import requests
 from datetime import datetime, timedelta
 from typing import List
 from app.models import Stats, FollowerSnapshot, ChangeEntry
@@ -11,20 +12,32 @@ def _get_conn():
     conn.row_factory = sqlite3.Row
     return conn
 
+def _fetch_github_total() -> int:
+    """Fetch the real follower count from GitHub’s REST API."""
+    token = os.getenv("GITHUB_TOKEN")
+    username = os.getenv("GITHUB_USERNAME")
+    if not token or not username:
+        raise RuntimeError("GITHUB_USERNAME and GITHUB_TOKEN must be set in env")
+    resp = requests.get(
+        f"https://api.github.com/users/{username}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    resp.raise_for_status()
+    return resp.json().get("followers", 0)
+
 def get_follower_stats() -> Stats:
     conn = _get_conn()
     cur = conn.cursor()
 
-    # total so far
-    cur.execute("SELECT COUNT(*) AS cnt FROM followers")
-    total = cur.fetchone()["cnt"]
+    # ← now pulled from GitHub, not from your local DB
+    total = _fetch_github_total()
 
-    # new in last 24h
+    # count of *newly tracked* followers in the last 24h
     cutoff = (datetime.utcnow() - timedelta(days=1)).timestamp()
     cur.execute("SELECT COUNT(*) AS cnt FROM followers WHERE timestamp >= ?", (cutoff,))
-    new = cur.fetchone()["cnt"]
+    new = cur.fetchone()["cnt"] or 0
 
-    # unfollowers: we'd track deletions in a separate table; stub to 0 for now
+    # unfollowers still stubbed (you’d track them in a separate table)
     lost = 0
 
     return Stats(
@@ -37,7 +50,6 @@ def get_follower_trends() -> List[FollowerSnapshot]:
     conn = _get_conn()
     cur = conn.cursor()
 
-    # you’d normally record snapshots in a separate table; for now mirror total count on each distinct timestamp
     cur.execute("""
         SELECT DISTINCT timestamp, COUNT(*) OVER (ORDER BY timestamp) AS total_followers
         FROM followers
@@ -65,7 +77,7 @@ def get_change_history(kind: str) -> List[ChangeEntry]:
             ORDER BY timestamp DESC
         """, (cutoff,))
     else:
-        # you’d track unfollows in a separate table — for now, return empty list
+        # no unfollow tracking yet
         return []
 
     rows = cur.fetchall()
