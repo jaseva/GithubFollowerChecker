@@ -23,14 +23,12 @@ from app.models import (
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 REPO_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))
-load_dotenv(os.path.join(REPO_ROOT, ".env"))
-load_dotenv(os.path.join(BASE_DIR, ".env"), override=True)
 
 DB_PATH = os.path.join(BASE_DIR, "followers.db")
 LEGACY_DB_PATH = os.path.join(REPO_ROOT, "follower_data.db")
 API_URL = "https://api.github.com"
-USERNAME = os.getenv("GITHUB_USERNAME")
-TOKEN = os.getenv("GITHUB_TOKEN")
+USERNAME: str | None = None
+TOKEN: str | None = None
 REQUEST_TIMEOUT = 20
 SQLITE_TIMEOUT_SECONDS = 30
 SQLITE_BUSY_TIMEOUT_MS = 30000
@@ -46,6 +44,11 @@ CHANGE_TABLES = {"new_followers", "lost_followers"}
 
 _DB_INIT_LOCK = Lock()
 _DB_INITIALIZED = False
+# _SYNC_LOCK prevents concurrent syncs within a single process. When running
+# with multiple worker processes (e.g. uvicorn --workers N), this lock cannot
+# coordinate across processes. To avoid SQLite "database is locked" errors in
+# that scenario, deploy with a single worker (uvicorn --workers 1) when using
+# the default SQLite backend.
 _SYNC_LOCK = Lock()
 
 
@@ -184,7 +187,7 @@ def init_db() -> None:
 
 
 def initialize_tracker_db() -> None:
-    global _DB_INITIALIZED
+    global _DB_INITIALIZED, USERNAME, TOKEN
 
     if _DB_INITIALIZED:
         return
@@ -192,6 +195,10 @@ def initialize_tracker_db() -> None:
     with _DB_INIT_LOCK:
         if _DB_INITIALIZED:
             return
+        load_dotenv(os.path.join(REPO_ROOT, ".env"))
+        load_dotenv(os.path.join(BASE_DIR, ".env"), override=True)
+        USERNAME = os.getenv("GITHUB_USERNAME")
+        TOKEN = os.getenv("GITHUB_TOKEN")
         init_db()
         _DB_INITIALIZED = True
 
@@ -512,6 +519,14 @@ def successful_sync_since(timestamp: datetime) -> bool:
 
 
 def sync_followers(*, force: bool = False) -> None:
+    """Sync follower data from the GitHub API.
+
+    Uses ``_SYNC_LOCK`` to prevent concurrent syncs within the same process.
+    When deployed with multiple worker processes (e.g. ``uvicorn --workers N``),
+    this lock cannot coordinate across processes and SQLite ``database is locked``
+    errors may occur. Run with a single worker (``uvicorn --workers 1``) when
+    using the default SQLite backend.
+    """
     initialize_tracker_db()
     requested_at = utcnow()
 
