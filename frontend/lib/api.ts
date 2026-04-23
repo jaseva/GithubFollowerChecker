@@ -1,6 +1,10 @@
-export interface Stats { total_followers: number; new_followers: number; unfollowers: number; }
-export interface Trends { labels: string[]; history: number[]; }
-export interface Change { username: string; timestamp: string; }
+export interface Stats {
+  total_followers: number;
+  new_followers: number;
+  unfollowers: number;
+  net_change: number;
+}
+
 export interface GitHubProfile {
   username: string;
   name: string | null;
@@ -10,29 +14,103 @@ export interface GitHubProfile {
   public_repos: number;
   following: number;
   followers: number;
+  company: string | null;
+  location: string | null;
+  created_at: string | null;
 }
 
-async function fetchJSON<T>(url: string): Promise<T> {
-  const res = await fetch(url, { credentials: "include" });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Failed to load ${url}: ${res.status} ${body}`);
+export interface Trends {
+  labels: string[];
+  history: number[];
+}
+
+export interface Change {
+  username: string;
+  timestamp: string;
+}
+
+export interface EnrichedChange extends Change {
+  name: string | null;
+  avatar_url: string | null;
+  html_url: string;
+  bio: string | null;
+  public_repos: number;
+  followers: number;
+  following: number;
+  company: string | null;
+  location: string | null;
+  created_at: string | null;
+  signal_score: number;
+  signal_label: string;
+}
+
+export interface DashboardMetrics {
+  total_followers: number;
+  following: number;
+  net_24h: number;
+  net_7d: number;
+  net_30d: number;
+  average_daily_growth: number;
+  churn_rate: number;
+  volatility_score: number;
+  stability_score: number;
+  snapshot_count: number;
+  change_records_30d: number;
+}
+
+export interface DashboardHealth {
+  api_status: "healthy" | "degraded" | "error";
+  partial_data: boolean;
+  stale_data: boolean;
+  last_successful_sync: string | null;
+  last_failed_sync: string | null;
+  last_error: string | null;
+  snapshot_count: number;
+  expected_cadence_minutes: number | null;
+  missed_snapshots: number;
+  data_freshness_minutes: number | null;
+}
+
+export interface ChartAnnotation {
+  timestamp: string;
+  kind: "spike" | "dip" | "gain" | "loss" | "peak" | "low";
+  label: string;
+  value: number;
+  magnitude: number;
+}
+
+export interface DashboardData {
+  generated_at: string;
+  profile: GitHubProfile;
+  stats: Stats;
+  metrics: DashboardMetrics;
+  trends: Trends;
+  health: DashboardHealth;
+  recent_new_followers: EnrichedChange[];
+  recent_lost_followers: EnrichedChange[];
+  all_new_followers: EnrichedChange[];
+  all_lost_followers: EnrichedChange[];
+  high_signal_new_followers: EnrichedChange[];
+  annotations: ChartAnnotation[];
+}
+
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
+
+async function fetchJSON<T>(path: string): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    throw new Error(`Failed to load ${path}: ${response.status} ${body}`);
   }
-  return res.json();
+
+  return response.json();
 }
 
-export function getFollowerStats(): Promise<Stats> {
-  return fetchJSON<Stats>("http://localhost:8000/stats/followers");
-}
-
-export function getGitHubProfile(): Promise<GitHubProfile> {
-  return fetchJSON<GitHubProfile>("http://localhost:8000/stats/profile");
-}
-
-export function getFollowerTrends(): Promise<Trends> {
-  return fetchJSON<Trends>("http://localhost:8000/stats/trends");
-}
-
-export function getChangeHistory(type: "new"|"lost"): Promise<Change[]> {
-  return fetchJSON<Change[]>(`http://localhost:8000/stats/history/${type}`);
+export function getDashboard(refresh = false): Promise<DashboardData> {
+  return fetchJSON<DashboardData>(`/stats/dashboard${refresh ? "?refresh=true" : ""}`);
 }

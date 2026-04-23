@@ -19,6 +19,10 @@
   <img src="docs/screenshots/dashboard.png" alt="GitHub Follower Intelligence dashboard" width="100%" />
 </p>
 
+<p align="center">
+  <img src="docs/screenshots/dashboard-detail.png" alt="GitHub Follower Intelligence chart, profile panel, and signal quality detail" width="100%" />
+</p>
+
 ## Why This Repo Stands Out
 
 - **A real analytics surface, not just a counter.** Track follower trends, 24-hour movement, churn, activity, and profile context in one view.
@@ -30,7 +34,7 @@
 
 | Experience | Best For | Stack | What You Get |
 | --- | --- | --- | --- |
-| **Web dashboard** | Daily monitoring, demos, polished analytics | Next.js, React, Tailwind CSS, Recharts, FastAPI | KPI cards, trend chart, follower activity, GitHub profile panel, signal quality panel |
+| **Web dashboard** | Daily monitoring, demos, polished analytics | Next.js, React, Tailwind CSS, custom SVG charts, FastAPI | KPI cards, trend chart, follower activity, GitHub profile panel, signal quality panel |
 | **Desktop utility** | Local automation, direct controls, quick tracking | Python, Tkinter, Matplotlib, OpenAI SDK | Follower tracking, follower file output, segmentation, charts, AI profile summaries |
 
 The recommended primary experience is the **web dashboard**.
@@ -116,11 +120,25 @@ Open:
 http://localhost:3000
 ```
 
-If `3000` is already in use, Next.js may fall back to `3001`. Local CORS is configured for both `3000` and `3001`.
+If `3000` is already in use, free it from the `frontend` folder with:
+
+```sh
+npm run kill
+```
+
+Or clear both common dev ports:
+
+```sh
+npm run kill:all
+```
 
 ## Dashboard API
 
-The web app reads from these local endpoints:
+The web app primarily reads from:
+
+- `GET /stats/dashboard`
+
+Supporting endpoints remain available:
 
 - `GET /stats/profile`
 - `GET /stats/followers`
@@ -218,9 +236,12 @@ flowchart LR
 │   ├── components/
 │   ├── lib/
 │   └── package.json
+├── scripts/
+│   └── kill-frontend.ps1
 ├── docs/
 │   └── screenshots/
 │       ├── dashboard.png
+│       ├── dashboard-detail.png
 │       └── desktop/
 ├── main.py
 ├── analytics.py
@@ -252,13 +273,29 @@ npx --yes pyright
 python -m py_compile main.py analytics.py backend/app/api/stats.py backend/app/services/tracker.py
 ```
 
-## Refreshing The Dashboard Screenshot
+## Refreshing The Dashboard Screenshots
 
 With the backend and frontend running:
 
 ```sh
 npx --yes playwright screenshot --browser=chromium --viewport-size=1980,1250 --wait-for-timeout=3000 http://localhost:3000 docs/screenshots/dashboard.png
 ```
+
+To refresh the focused detail image from the same capture on Windows PowerShell:
+
+```powershell
+Add-Type -AssemblyName System.Drawing
+$source = "docs/screenshots/dashboard.png"
+$target = "docs/screenshots/dashboard-detail.png"
+$bitmap = [System.Drawing.Bitmap]::new($source)
+$rect = [System.Drawing.Rectangle]::new(150, 300, 1700, 760)
+$crop = $bitmap.Clone($rect, $bitmap.PixelFormat)
+$crop.Save($target, [System.Drawing.Imaging.ImageFormat]::Png)
+$crop.Dispose()
+$bitmap.Dispose()
+```
+
+The crop values above are tuned for the `1980x1250` dashboard capture command shown here.
 
 If Playwright needs Chromium installed:
 

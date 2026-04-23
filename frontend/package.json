@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3000",
+    "kill": "powershell -ExecutionPolicy Bypass -File ..\\scripts\\kill-frontend.ps1",
+    "kill:all": "powershell -ExecutionPolicy Bypass -File ..\\scripts\\kill-frontend.ps1 -Ports 3000 3001",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
