@@ -1,10 +1,55 @@
 # GitHub Follower Checker
 
-Track your GitHub follower count, follower changes, and profile growth trends with a polished web dashboard and an optional Tkinter desktop utility.
+Track your GitHub follower count, follower changes, and profile growth trends with a polished ShadCN-style web dashboard and an optional Tkinter desktop utility.
 
 The current recommended experience is the Next.js + FastAPI dashboard. It presents follower metrics, trend history, GitHub profile context, new/lost follower activity, and data quality signals in one dense analytics view.
 
+## Application Experiences
+
+This repo includes two user experiences with different goals:
+
+- **ShadCN-style web dashboard:** the modern analytics dashboard built with Next.js, Tailwind CSS, Recharts, and FastAPI. Use this for the richest day-to-day follower intelligence experience.
+- **Desktop application:** the original Tkinter app. Use this for local tracking, follower segmentation, Matplotlib charts, JSON follower history, and OpenAI profile summaries.
+
+### ShadCN-Style Web Dashboard
+
 ![GitHub Follower Intelligence dashboard](docs/screenshots/dashboard.png)
+
+### Desktop Tkinter Application
+
+The desktop application is still useful for local workflows that need direct Tkinter controls, saved JSON history, Matplotlib charts, and OpenAI-generated GitHub profile summaries.
+
+<table>
+  <tr>
+    <td width="50%">
+      <img src="docs/screenshots/desktop/followers-tracked.png" alt="Tkinter desktop app showing tracked followers, unfollowers, not-following-back users, and follow-back results" />
+      <p><strong>Follower tracking results</strong></p>
+    </td>
+    <td width="50%">
+      <img src="docs/screenshots/desktop/not-following-back.png" alt="Tkinter desktop app showing users who are not following back" />
+      <p><strong>Not-following-back view</strong></p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <img src="docs/screenshots/desktop/profile-summary.png" alt="Tkinter desktop app showing an AI-generated GitHub profile summary" />
+      <p><strong>OpenAI profile summary</strong></p>
+    </td>
+    <td width="50%">
+      <img src="docs/screenshots/desktop/follower-growth-chart.png" alt="Matplotlib chart showing follower growth over time" />
+      <p><strong>Follower growth chart</strong></p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <img src="docs/screenshots/desktop/follower-history-json.png" alt="Follower JSON file showing stored followers and history snapshots" />
+      <p><strong>Saved follower history JSON</strong></p>
+    </td>
+    <td width="50%">
+      <p>The desktop app screenshots show the legacy local workflow. The dashboard screenshot above shows the newer web analytics experience.</p>
+    </td>
+  </tr>
+</table>
 
 ## Features
 
@@ -136,7 +181,13 @@ Use it to:
 │   └── package.json
 ├── docs/
 │   └── screenshots/
-│       └── dashboard.png
+│       ├── dashboard.png
+│       └── desktop/
+│           ├── followers-tracked.png
+│           ├── not-following-back.png
+│           ├── profile-summary.png
+│           ├── follower-growth-chart.png
+│           └── follower-history-json.png
 ├── main.py
 ├── analytics.py
 ├── requirements.txt
@@ -159,7 +210,7 @@ cd frontend
 npm run build
 ```
 
-## Updating The Screenshot
+## Updating Screenshots
 
 With the backend and frontend running, capture a new dashboard screenshot:
 
@@ -172,6 +223,8 @@ If Playwright asks for a browser install:
 ```sh
 npx --yes playwright install chromium
 ```
+
+Desktop application screenshots should be saved under `docs/screenshots/desktop/` using the filenames shown in the project structure above. The root README references those exact files.
 
 ## Notes
 
