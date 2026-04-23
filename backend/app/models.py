@@ -1,5 +1,7 @@
+# app/models.py
 from pydantic import BaseModel
 from datetime import datetime
+from typing import List
 
 class Stats(BaseModel):
     total_followers: int
@@ -7,8 +9,8 @@ class Stats(BaseModel):
     unfollowers: int
 
 class Trends(BaseModel):
-    labels: list[datetime]
-    history: list[int]
+    labels: List[datetime]
+    history: List[int]
 
 class Change(BaseModel):
     username: str

@@ -6,10 +6,15 @@
 
 requests
 matplotlib
-tkinter
 openai
 python-dotenv
 fastapi
 uvicorn
 pydantic
 apscheduler
+selenium
+beautifulsoup4
+lxml
+
+# tkinter ships with most Python installers. If it is missing, install it
+# through your OS/Python distribution rather than pip.
