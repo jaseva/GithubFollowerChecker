@@ -1,58 +1,70 @@
 # GitHub Follower Checker
 
-Track your GitHub follower count, follower changes, and profile growth trends with a polished ShadCN-style web dashboard and an optional Tkinter desktop utility.
+<p align="center">
+  <img src="https://img.shields.io/badge/Next.js-15-black?style=for-the-badge&logo=next.js" alt="Next.js 15" />
+  <img src="https://img.shields.io/badge/FastAPI-API-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI" />
+  <img src="https://img.shields.io/badge/React-19-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" alt="React 19" />
+  <img src="https://img.shields.io/badge/Tailwind_CSS-4-0F172A?style=for-the-badge&logo=tailwindcss&logoColor=38BDF8" alt="Tailwind CSS 4" />
+  <img src="https://img.shields.io/badge/SQLite-Local_Data-003B57?style=for-the-badge&logo=sqlite&logoColor=white" alt="SQLite" />
+  <img src="https://img.shields.io/badge/Tkinter-Desktop_App-1F2937?style=for-the-badge" alt="Tkinter Desktop App" />
+</p>
 
-The current recommended experience is the Next.js + FastAPI dashboard. It presents follower metrics, trend history, GitHub profile context, new/lost follower activity, and data quality signals in one dense analytics view.
+<p align="center">
+  A GitHub follower analytics project with two distinct experiences:
+  <strong>a polished ShadCN-style web dashboard</strong> for dense, modern analytics and a
+  <strong>desktop Tkinter utility</strong> for local tracking, charts, and AI profile summaries.
+</p>
 
-## Application Experiences
+<p align="center">
+  <img src="docs/screenshots/dashboard.png" alt="GitHub Follower Intelligence dashboard" width="100%" />
+</p>
 
-This repo includes two user experiences with different goals:
+## Why This Repo Stands Out
 
-- **ShadCN-style web dashboard:** the modern analytics dashboard built with Next.js, Tailwind CSS, Recharts, and FastAPI. Use this for the richest day-to-day follower intelligence experience.
-- **Desktop application:** the original Tkinter app. Use this for local tracking, follower segmentation, Matplotlib charts, JSON follower history, and OpenAI profile summaries.
+- **A real analytics surface, not just a counter.** Track follower trends, 24-hour movement, churn, activity, and profile context in one view.
+- **Two workflows in one repo.** Use the web dashboard for a modern product experience and the Tkinter app for local utility workflows.
+- **Practical data pipeline.** FastAPI backend, SQLite persistence, live GitHub API reads, and a responsive React frontend.
+- **Built for extension.** The current structure supports future notifications, richer timeline analysis, segmentation, and more advanced summaries.
 
-### ShadCN-Style Web Dashboard
+## Choose Your Experience
 
-![GitHub Follower Intelligence dashboard](docs/screenshots/dashboard.png)
+| Experience | Best For | Stack | What You Get |
+| --- | --- | --- | --- |
+| **Web dashboard** | Daily monitoring, demos, polished analytics | Next.js, React, Tailwind CSS, Recharts, FastAPI | KPI cards, trend chart, follower activity, GitHub profile panel, signal quality panel |
+| **Desktop utility** | Local automation, direct controls, quick tracking | Python, Tkinter, Matplotlib, OpenAI SDK | Follower tracking, follower file output, segmentation, charts, AI profile summaries |
 
-### Desktop Tkinter Application
+The recommended primary experience is the **web dashboard**.
 
-The desktop application is still useful for local workflows that need direct Tkinter controls, saved JSON history, Matplotlib charts, and OpenAI-generated GitHub profile summaries.
+## Core Features
 
-Desktop screenshots should be saved in `docs/screenshots/desktop/` with these filenames:
+- **Follower intelligence dashboard**
+  - Total followers
+  - 24-hour net movement
+  - New followers
+  - Lost followers
+- **Interactive follower growth chart**
+  - 7-day, 30-day, and all-time ranges
+  - Snapshot-based growth tracking
+- **GitHub profile context**
+  - Avatar
+  - Bio
+  - Public repositories
+  - Following count
+  - Direct profile link
+- **Signal quality panel**
+  - Stability
+  - Monitoring window
+  - Data point count
+  - Last sync timestamp
+- **Desktop utility workflows**
+  - Local follower tracking
+  - JSON history file output
+  - Matplotlib analytics
+  - OpenAI-generated profile summaries
 
-- `followers-tracked.png` - follower tracking results
-- `not-following-back.png` - users who are not following back
-- `profile-summary.png` - OpenAI-generated profile summary
-- `follower-growth-chart.png` - Matplotlib follower growth chart
-- `follower-history-json.png` - saved follower JSON/history file
+## Quick Start
 
-After those files are added, this README can render them as a gallery. Until then, the filenames above are listed instead of broken image links.
-
-## Features
-
-- **Follower intelligence dashboard** with total followers, 24-hour net movement, new followers, and lost followers.
-- **Interactive growth chart** with 7-day, 30-day, and all-time range controls.
-- **GitHub profile panel** with avatar, bio, public repositories, following count, and profile link.
-- **Signal quality panel** with stability, monitoring window, data point count, and last sync.
-- **Follower activity panels** for recent gained and lost followers.
-- **FastAPI backend** that stores follower snapshots in SQLite and exposes dashboard endpoints.
-- **Legacy Tkinter app** for local follower tracking, segmentation, charts, and OpenAI-powered profile summaries.
-
-## Tech Stack
-
-- **Frontend:** Next.js, React, TypeScript, Tailwind CSS, Recharts, Lucide icons
-- **Backend:** FastAPI, Pydantic, SQLite, Requests
-- **Desktop utility:** Python, Tkinter, Matplotlib, OpenAI SDK
-
-## Prerequisites
-
-- Python 3.10 or newer
-- Node.js 18 or newer
-- A GitHub personal access token
-- Optional: an OpenAI API key for the Tkinter profile summary feature
-
-## Environment Variables
+### 1. Environment Variables
 
 Create a `.env` file in the repository root:
 
@@ -62,20 +74,20 @@ GITHUB_TOKEN=your-github-token
 OPENAI_API_KEY=your-openai-api-key
 ```
 
-`OPENAI_API_KEY` is only required for the desktop profile summary feature. The web dashboard uses `GITHUB_USERNAME` and `GITHUB_TOKEN`.
+`OPENAI_API_KEY` is optional and only required for the desktop profile summary workflow.
 
-The backend also supports `backend/.env` for local overrides. That file is ignored by git.
+The backend supports `backend/.env` as a local override if you want to keep web-dashboard credentials separate.
 
-## Install
+### 2. Install Dependencies
 
-Install Python dependencies:
+Python:
 
 ```sh
 python -m pip install -r requirements.txt
 python -m pip install -r backend/requirements.txt
 ```
 
-Install frontend dependencies:
+Frontend:
 
 ```sh
 cd frontend
@@ -83,7 +95,7 @@ npm install
 cd ..
 ```
 
-## Run The Web Dashboard
+### 3. Run The Web Dashboard
 
 Start the FastAPI backend:
 
@@ -91,7 +103,7 @@ Start the FastAPI backend:
 python -m uvicorn app.main:app --app-dir backend --reload --host 127.0.0.1 --port 8000
 ```
 
-In a second terminal, start the Next.js frontend:
+Start the frontend in a second terminal:
 
 ```sh
 cd frontend
@@ -104,27 +116,27 @@ Open:
 http://localhost:3000
 ```
 
-The dashboard fetches data from:
+If `3000` is already in use, Next.js may fall back to `3001`. Local CORS is configured for both `3000` and `3001`.
 
-- `GET http://localhost:8000/stats/profile`
-- `GET http://localhost:8000/stats/followers`
-- `GET http://localhost:8000/stats/trends`
-- `GET http://localhost:8000/stats/history/new`
-- `GET http://localhost:8000/stats/history/lost`
+## Dashboard API
 
-## Run A Production Build
+The web app reads from these local endpoints:
 
-```sh
-cd frontend
-npm run build
-npm run start
+- `GET /stats/profile`
+- `GET /stats/followers`
+- `GET /stats/trends`
+- `GET /stats/history/new`
+- `GET /stats/history/lost`
+
+Base URL during development:
+
+```text
+http://localhost:8000
 ```
 
-Keep the FastAPI backend running on port `8000` while using the production frontend.
+## Desktop Tkinter Utility
 
-## Run The Desktop Tkinter App
-
-The original desktop app is still available:
+Run the legacy desktop application with:
 
 ```sh
 python main.py
@@ -132,16 +144,25 @@ python main.py
 
 Use it to:
 
-- Track followers into `followers.json` and SQLite.
-- View follower/unfollower charts with Matplotlib.
-- Segment followers.
-- Generate OpenAI summaries for GitHub profiles.
+- Track followers into a local JSON file
+- View follower and unfollower charts with Matplotlib
+- Segment followers
+- Generate GitHub profile summaries with OpenAI
 
-## Data Storage
+The desktop application remains part of the repo because it is useful for local workflows and historical tracking, even though the dashboard is now the primary user experience.
 
-- Web dashboard snapshots are stored in `backend/followers.db`.
-- The Tkinter app stores local data in `follower_data.db` and `followers.json`.
-- Local database and environment files are ignored by git.
+## Architecture
+
+```mermaid
+flowchart LR
+    A[GitHub API] --> B[FastAPI Backend]
+    B --> C[(SQLite)]
+    B --> D[Next.js Dashboard]
+    A --> E[Tkinter Desktop Utility]
+    E --> F[(JSON + SQLite)]
+    E --> G[Matplotlib Charts]
+    E --> H[OpenAI Summary]
+```
 
 ## Project Structure
 
@@ -155,59 +176,61 @@ Use it to:
 │       └── models.py
 ├── frontend/
 │   ├── app/
+│   ├── components/
 │   ├── lib/
 │   └── package.json
 ├── docs/
 │   └── screenshots/
 │       ├── dashboard.png
 │       └── desktop/
-│           ├── followers-tracked.png
-│           ├── not-following-back.png
-│           ├── profile-summary.png
-│           ├── follower-growth-chart.png
-│           └── follower-history-json.png
 ├── main.py
 ├── analytics.py
 ├── requirements.txt
 └── README.md
 ```
 
-## Verify Changes
+## Local Data
 
-Backend/Python:
+- Web dashboard snapshots: `backend/followers.db`
+- Desktop utility data: `follower_data.db` and local follower JSON files
+
+Database files and environment files are ignored by git.
+
+## Development Commands
+
+Frontend production build:
+
+```sh
+cd frontend
+npm run build
+npm run start
+```
+
+Type and compile checks:
 
 ```sh
 npx --yes pyright
 python -m py_compile main.py analytics.py backend/app/api/stats.py backend/app/services/tracker.py
 ```
 
-Frontend:
+## Refreshing The Dashboard Screenshot
 
-```sh
-cd frontend
-npm run build
-```
-
-## Updating Screenshots
-
-With the backend and frontend running, capture a new dashboard screenshot:
+With the backend and frontend running:
 
 ```sh
 npx --yes playwright screenshot --browser=chromium --viewport-size=1980,1250 --wait-for-timeout=3000 http://localhost:3000 docs/screenshots/dashboard.png
 ```
 
-If Playwright asks for a browser install:
+If Playwright needs Chromium installed:
 
 ```sh
 npx --yes playwright install chromium
 ```
 
-Desktop application screenshots should be saved under `docs/screenshots/desktop/` using the filenames shown in the project structure above. The root README references those exact files.
-
 ## Notes
 
-- GitHub follower history is based on snapshots taken when the app requests follower stats.
-- The dashboard is optimized for desktop analytics use. It fits in one viewport on large desktop screens and becomes scrollable on smaller screens.
+- Follower growth is based on stored snapshots, so the historical chart improves as the app is used over time.
+- The dashboard is optimized for desktop analytics and becomes scrollable on smaller viewports.
 - Keep your `.env`, tokens, and local database files out of version control.
 
 ## License
