@@ -962,6 +962,10 @@ def get_dashboard_data(*, refresh: bool = False) -> DashboardData:
         recent_lost = enrich_change_rows(conn, recent_lost_rows, allow_fetch=refresh)
         all_new = enrich_change_rows(conn, all_new_rows, allow_fetch=refresh)
         all_lost = enrich_change_rows(conn, all_lost_rows, allow_fetch=refresh)
+
+        if refresh:
+            conn.commit()
+
         high_signal_new = sorted(
             all_new,
             key=lambda item: (item.signal_score, item.followers, item.public_repos),
@@ -985,7 +989,7 @@ def get_dashboard_data(*, refresh: bool = False) -> DashboardData:
         health = compute_health(conn, trends, partial_data=partial_data, last_error_override=last_error)
         annotations = build_annotations(trends, len(recent_new), len(recent_lost))
 
-        return DashboardData(
+        result = DashboardData(
             generated_at=utcnow(),
             profile=profile,
             stats=stats,
@@ -999,6 +1003,7 @@ def get_dashboard_data(*, refresh: bool = False) -> DashboardData:
             high_signal_new_followers=high_signal_new,
             annotations=annotations,
         )
+        return result
     finally:
         conn.close()
 
