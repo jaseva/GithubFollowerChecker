@@ -1,14 +1,22 @@
 from fastapi import APIRouter, HTTPException
 
-from app.models import Change, Stats, Trends
+from app.models import Change, GitHubProfile, Stats, Trends
 
 from app.services.tracker import (
+    get_github_profile,
     get_follower_stats,
     get_follower_trends,
     get_change_history,
 )
 
 router = APIRouter()
+
+@router.get("/profile", response_model=GitHubProfile)
+async def profile() -> GitHubProfile:
+    try:
+        return get_github_profile()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/followers", response_model=Stats)
 async def total_followers() -> Stats:

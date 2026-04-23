@@ -5,7 +5,7 @@ import requests
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
-from app.models import Stats, Trends, Change
+from app.models import Change, GitHubProfile, Stats, Trends
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 load_dotenv(os.path.join(BASE_DIR, ".env"))
@@ -15,6 +15,15 @@ API_URL = "https://api.github.com"
 USERNAME = os.getenv("GITHUB_USERNAME")
 TOKEN    = os.getenv("GITHUB_TOKEN")
 HEADERS  = {"Authorization": f"token {TOKEN}"}
+
+
+def fetch_github_profile() -> dict:
+    if not USERNAME:
+        raise RuntimeError("GITHUB_USERNAME is not configured.")
+
+    r = requests.get(f"{API_URL}/users/{USERNAME}", headers=HEADERS)
+    r.raise_for_status()
+    return r.json()
 
 def init_db():
     """Ensure all needed tables exist."""
@@ -47,9 +56,7 @@ init_db()
 
 def get_follower_stats() -> Stats:
     # 1) fetch the current follower count from GitHub
-    r = requests.get(f"{API_URL}/users/{USERNAME}", headers=HEADERS)
-    r.raise_for_status()
-    total = r.json()["followers"]
+    total = fetch_github_profile()["followers"]
 
     now = datetime.utcnow().isoformat()
     conn = sqlite3.connect(DB_PATH)
@@ -81,6 +88,20 @@ def get_follower_stats() -> Stats:
         total_followers=total,
         new_followers=new,
         unfollowers=lost,
+    )
+
+
+def get_github_profile() -> GitHubProfile:
+    data = fetch_github_profile()
+    return GitHubProfile(
+        username=data["login"],
+        name=data.get("name"),
+        avatar_url=data.get("avatar_url"),
+        html_url=data["html_url"],
+        bio=data.get("bio"),
+        public_repos=data.get("public_repos", 0),
+        following=data.get("following", 0),
+        followers=data.get("followers", 0),
     )
 
 
