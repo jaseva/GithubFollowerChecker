@@ -70,7 +70,7 @@ def parse_datetime(value: str | None) -> datetime | None:
 def build_headers() -> dict[str, str]:
     headers = {"Accept": "application/vnd.github+json"}
     if TOKEN:
-        headers["Authorization"] = f"token {TOKEN}"
+        headers["Authorization"] = f"Bearer {TOKEN}"
     return headers
 
 
