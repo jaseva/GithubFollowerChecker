@@ -1,160 +1,190 @@
 # GitHub Follower Checker
 
-This app tracks your GitHub profile for who follows you, who follows you back, and who unfollows you. It now includes advanced analytics to visualize follower growth trends, track engagement metrics, and segment followers.
+Track your GitHub follower count, follower changes, and profile growth trends with a polished web dashboard and an optional Tkinter desktop utility.
+
+The current recommended experience is the Next.js + FastAPI dashboard. It presents follower metrics, trend history, GitHub profile context, new/lost follower activity, and data quality signals in one dense analytics view.
+
+![GitHub Follower Intelligence dashboard](docs/screenshots/dashboard.png)
 
 ## Features
-- Tracks followers and unfollowers.
-- Stores follower data in a database.
-- Provides analytics, including follower growth plots and segmentation.
-- Generates AI Summaries of user profiles (OpenAI GPT Models).
 
-## Getting Started
+- **Follower intelligence dashboard** with total followers, 24-hour net movement, new followers, and lost followers.
+- **Interactive growth chart** with 7-day, 30-day, and all-time range controls.
+- **GitHub profile panel** with avatar, bio, public repositories, following count, and profile link.
+- **Signal quality panel** with stability, monitoring window, data point count, and last sync.
+- **Follower activity panels** for recent gained and lost followers.
+- **FastAPI backend** that stores follower snapshots in SQLite and exposes dashboard endpoints.
+- **Legacy Tkinter app** for local follower tracking, segmentation, charts, and OpenAI-powered profile summaries.
 
-### Prerequisites
+## Tech Stack
 
-To get started, you'll need:
+- **Frontend:** Next.js, React, TypeScript, Tailwind CSS, Recharts, Lucide icons
+- **Backend:** FastAPI, Pydantic, SQLite, Requests
+- **Desktop utility:** Python, Tkinter, Matplotlib, OpenAI SDK
 
-- **Python 3** installed on your machine.
-- The following Python libraries:
-  - `requests`
-  - `matplotlib`
-  - `tkinter`
-  - `openai`
-  - `python-dotenv`
-  
-- A **personal access token** from GitHub to authenticate your requests to the API.
-- An **API Key** from OpenAI to access GTP LLM models to summarize GitHub API requests.
+## Prerequisites
 
-### Installation
+- Python 3.10 or newer
+- Node.js 18 or newer
+- A GitHub personal access token
+- Optional: an OpenAI API key for the Tkinter profile summary feature
 
-1. **Clone the Repository**:
-    ```sh
-    git clone https://github.com/yourusername/github_follower_checker.git
-    cd github_follower_checker
-    ```
+## Environment Variables
 
-2. **Install Dependencies**:
-    Install the required libraries using pip:
-    ```sh
-    pip install -r requirements.txt
-    ```
+Create a `.env` file in the repository root:
 
-3. **Set Up Your Credentials**:
-   - This step involves setting up two credentials:
+```env
+GITHUB_USERNAME=your-github-username
+GITHUB_TOKEN=your-github-token
+OPENAI_API_KEY=your-openai-api-key
+```
 
-   a. **GitHub Personal Access Token**:
+`OPENAI_API_KEY` is only required for the desktop profile summary feature. The web dashboard uses `GITHUB_USERNAME` and `GITHUB_TOKEN`.
 
-      - Generate a personal access token from GitHub by following [these instructions](https://docs.github.com/en/github/authenticating-to-github/creating-a-personal-access-token).   
-      - Make sure to grant the "repo" and "user" scopes to allow the application to access your follower data and profile information.
-      - Save your token securely. We recommend using a password manager or a dedicated secrets store.
+The backend also supports `backend/.env` for local overrides. That file is ignored by git.
 
-   b. **OpenAI API Key**:
+## Install
 
-      - Create an OpenAI API key by following these instructions: https://platform.openai.com/account/api-keys
-      - You'll need an OpenAI account for this.
-      - Save your API key securely.
+Install Python dependencies:
 
-4. **Create a .env File**:
+```sh
+python -m pip install -r requirements.txt
+python -m pip install -r backend/requirements.txt
+```
 
-   - Create a new file named .env in the root directory of your project (where the README.md file is located).
-   - This file is used to store sensitive information like API keys.
-   - Important: Do not commit the .env file to version control (e.g., Git). This prevents your API keys from being exposed publicly.
-   - Add the following line to your .env file, replacing <your_github_token> and <your_openai_api_key> with your actual credentials:
-   - GITHUB_TOKEN=<your_github_token>
-   - OPENAI_API_KEY=<your_openai_api_key>
+Install frontend dependencies:
 
-5. **Run the Application**:
+```sh
+cd frontend
+npm install
+cd ..
+```
 
-   - Once you've completed these steps, you can run the application using the following command:
-     
-   ```sh
-   python main.py
-   ```
+## Run The Web Dashboard
 
-   - This will start the Github Follower Tracker application with the necessary credentials.
-  
-### Usage
+Start the FastAPI backend:
 
-To use the GitHub Follower Checker, run the `main.py` script in the terminal or a Python IDE.
-- Input your GitHub username, personal access token, and the desired file name to store followers.
-- Click **Start Tracking** to begin monitoring your followers.
-- Use **Show Analytics** to visualize follower growth.
-- Use **Segment Followers** to categorize followers by activity or other metrics.
+```sh
+python -m uvicorn app.main:app --app-dir backend --reload --host 127.0.0.1 --port 8000
+```
 
-<div align="center">
-<img width="1280" alt="image" src="https://github.com/user-attachments/assets/24511f2e-e599-46c9-ab1c-ecf60d19e69c">
+In a second terminal, start the Next.js frontend:
 
-<img width="1277" alt="image" src="https://github.com/user-attachments/assets/88e595c2-14e7-4eea-a6a0-cd9b907c84c1">
+```sh
+cd frontend
+npm run dev
+```
 
-<img width="752" alt="image" src="https://github.com/user-attachments/assets/b7e45584-711d-451d-aca2-a938ff50d0a7">
+Open:
 
-<img width="1280" alt="image" src="https://github.com/user-attachments/assets/3ed3c12b-90a5-4eba-ac9b-ea41c64214dd">
+```text
+http://localhost:3000
+```
 
-<img width="865" alt="image" src="https://github.com/user-attachments/assets/3692f375-61c6-458d-8969-efaddbb504f3">
+The dashboard fetches data from:
 
-<img width="253" alt="image" src="https://github.com/user-attachments/assets/1d2b1917-e73e-4c73-b513-938e134eaef0">
+- `GET http://localhost:8000/stats/profile`
+- `GET http://localhost:8000/stats/followers`
+- `GET http://localhost:8000/stats/trends`
+- `GET http://localhost:8000/stats/history/new`
+- `GET http://localhost:8000/stats/history/lost`
 
-<img width="309" alt="image" src="https://github.com/user-attachments/assets/2f78c707-f960-41ab-ab51-e675281938c1">
-</div>
+## Run A Production Build
 
-## User Interface
+```sh
+cd frontend
+npm run build
+npm run start
+```
 
-- **GitHub Username**: Enter the GitHub username you want to track or generate a summary (uses OpenAI GPT models).
-- **Personal Access Token**: Enter your GitHub personal access token.
-- **Followers File Name**: Specify the name of the file where follower data will be stored (e.g., `followers.json`).
-- **Start Tracking**: Click this button to begin tracking your followers.
-- **Show Analytics**: After tracking, use this button to visualize follower growth trends.
-- **Segment Followers**: This feature allows you to group your followers based on various criteria like activity or date followed.
+Keep the FastAPI backend running on port `8000` while using the production frontend.
 
-### Advanced Analytics
+## Run The Desktop Tkinter App
 
-The GitHub Follower Tracker now includes advanced analytics features:
+The original desktop app is still available:
 
-- **Follower Growth Trends**: Visualize your follower growth over time with charts and graphs.
-- **Engagement Metrics**: Although this feature is currently a placeholder, it will eventually track your interaction history with followers (e.g., comments, likes).
-- **Follower Segmentation**: Group followers based on criteria like activity level, date followed, or contribution to repositories.
+```sh
+python main.py
+```
+
+Use it to:
+
+- Track followers into `followers.json` and SQLite.
+- View follower/unfollower charts with Matplotlib.
+- Segment followers.
+- Generate OpenAI summaries for GitHub profiles.
+
+## Data Storage
+
+- Web dashboard snapshots are stored in `backend/followers.db`.
+- The Tkinter app stores local data in `follower_data.db` and `followers.json`.
+- Local database and environment files are ignored by git.
+
+## Project Structure
+
+```text
+.
+├── backend/
+│   └── app/
+│       ├── api/
+│       ├── services/
+│       ├── main.py
+│       └── models.py
+├── frontend/
+│   ├── app/
+│   ├── lib/
+│   └── package.json
+├── docs/
+│   └── screenshots/
+│       └── dashboard.png
+├── main.py
+├── analytics.py
+├── requirements.txt
+└── README.md
+```
+
+## Verify Changes
+
+Backend/Python:
+
+```sh
+npx --yes pyright
+python -m py_compile main.py analytics.py backend/app/api/stats.py backend/app/services/tracker.py
+```
+
+Frontend:
+
+```sh
+cd frontend
+npm run build
+```
+
+## Updating The Screenshot
+
+With the backend and frontend running, capture a new dashboard screenshot:
+
+```sh
+npx --yes playwright screenshot --browser=chromium --viewport-size=1980,1250 --wait-for-timeout=3000 http://localhost:3000 docs/screenshots/dashboard.png
+```
+
+If Playwright asks for a browser install:
+
+```sh
+npx --yes playwright install chromium
+```
 
 ## Notes
-- Follower history is stored in a SQLite database (`followers.db`).
-- Date of following is approximated by when the tracking script is run.
 
-### Example
+- GitHub follower history is based on snapshots taken when the app requests follower stats.
+- The dashboard is optimized for desktop analytics use. It fits in one viewport on large desktop screens and becomes scrollable on smaller screens.
+- Keep your `.env`, tokens, and local database files out of version control.
 
-1. **Start Tracking**:
-    ```sh
-    python main.py
-    ```
+## License
 
-2. **View Follower Growth**:
-    - After running the script and tracking followers, click on the "Show Analytics" button to visualize your follower growth over time.
+This project is licensed under the MIT License. See [LICENSE](LICENSE).
 
-3. **Segment Followers**:
-    - Choose a segmentation type from the dropdown and click "Segment Followers" to group followers accordingly.
+## Support
 
-### Project Structure
+If this project is useful, you can support it here:
 
-- `main.py`: The main script to run the application.
-- `analytics.py`: Handles the advanced analytics, such as plotting follower growth and segmenting followers.
-- `utils.py`: Contains utility functions for fetching and formatting follower data.
-- `requirements.txt`: Lists the dependencies required to run the application.
-- `README.md`: Documentation for the project.
-
-### Contributing
-
-Contributions are always welcome! If you find a bug or want to add a new feature, feel free to submit a pull request. To get started:
-
-1. Fork this repository.
-2. Create a new branch for your changes.
-3. Make your changes and submit a pull request with a brief description.
-
-### License
-
-This project is licensed under the MIT License - see the `LICENSE.md` file for details.
-
-### Acknowledgments
-
-- Thanks to the GitHub API team for providing an easy-to-use API for fetching user data.
-- Thanks to the developers of the `requests`, `matplotlib`, `tkinter`, `openai`, and `python-dotenv` libraries for making HTTP requests and data visualization in Python straightforward.
-
-  [Donate](https://www.paypal.com/donate/?hosted_button_id=AQCPKNSDGMJLL) to support this project if you found it useful!
-
+[Donate](https://www.paypal.com/donate/?hosted_button_id=AQCPKNSDGMJLL)

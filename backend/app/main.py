@@ -10,8 +10,14 @@ app = FastAPI(
     version="0.1.0"
 )
 
-# Enable CORS so the frontend at localhost:3000 can talk to this API
-to_allow = ["http://localhost:3000"]
+# Enable CORS for local Next.js dev servers. Next automatically falls back to
+# 3001 when 3000 is already occupied.
+to_allow = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
+]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=to_allow,

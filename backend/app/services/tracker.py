@@ -8,7 +8,9 @@ from dotenv import load_dotenv
 from app.models import Change, GitHubProfile, Stats, Trends
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-load_dotenv(os.path.join(BASE_DIR, ".env"))
+REPO_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))
+load_dotenv(os.path.join(REPO_ROOT, ".env"))
+load_dotenv(os.path.join(BASE_DIR, ".env"), override=True)
 
 DB_PATH = os.path.join(BASE_DIR, "followers.db")
 API_URL = "https://api.github.com"
