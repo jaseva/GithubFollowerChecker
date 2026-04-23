@@ -206,6 +206,13 @@ flowchart LR
 │       ├── services/
 │       ├── main.py
 │       └── models.py
+├── archive/
+│   ├── legacy-main-scripts/
+│   │   ├── README.md
+│   │   └── main1.py ... main12.py
+│   └── legacy-follow-scripts/
+│       ├── README.md
+│       └── follow_unfollow_main*.py
 ├── frontend/
 │   ├── app/
 │   ├── components/
@@ -263,6 +270,8 @@ npx --yes playwright install chromium
 
 - Follower growth is based on stored snapshots, so the historical chart improves as the app is used over time.
 - The dashboard is optimized for desktop analytics and becomes scrollable on smaller viewports.
+- Historical numbered `main*.py` snapshots are archived under `archive/legacy-main-scripts/`.
+- Legacy Selenium follow/unfollow scripts are archived under `archive/legacy-follow-scripts/`.
 - Keep your `.env`, tokens, and local database files out of version control.
 
 ## License
