@@ -1,6 +1,6 @@
-# app/api/stats.py
 from fastapi import APIRouter, HTTPException
-from starlette.responses import JSONResponse
+
+from app.models import Change, Stats, Trends
 
 from app.services.tracker import (
     get_follower_stats,
@@ -10,28 +10,25 @@ from app.services.tracker import (
 
 router = APIRouter()
 
-@router.get("/followers")
-async def total_followers():
+@router.get("/followers", response_model=Stats)
+async def total_followers() -> Stats:
     try:
-        stats = get_follower_stats()
-        return JSONResponse(stats.dict())
+        return get_follower_stats()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/trends")
-async def trends():
+@router.get("/trends", response_model=Trends)
+async def trends() -> Trends:
     try:
-        t = get_follower_trends()
-        return JSONResponse(t.dict())
+        return get_follower_trends()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/history/{change_type}")
-async def history(change_type: str):
+@router.get("/history/{change_type}", response_model=list[Change])
+async def history(change_type: str) -> list[Change]:
     if change_type not in ("new", "lost"):
         raise HTTPException(status_code=400, detail="must be 'new' or 'lost'")
     try:
-        changes = get_change_history(change_type)
-        return JSONResponse([c.dict() for c in changes])
+        return get_change_history(change_type)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
