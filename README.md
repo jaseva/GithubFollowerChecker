@@ -151,6 +151,38 @@ Use it to:
 
 The desktop application remains part of the repo because it is useful for local workflows and historical tracking, even though the dashboard is now the primary user experience.
 
+<table>
+  <tr>
+    <td width="50%">
+      <img src="docs/screenshots/desktop/followers-tracked.png" alt="Desktop follower tracking results" />
+      <p><strong>Follower tracking results</strong></p>
+    </td>
+    <td width="50%">
+      <img src="docs/screenshots/desktop/not-following-back.png" alt="Desktop not-following-back view" />
+      <p><strong>Not-following-back view</strong></p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <img src="docs/screenshots/desktop/profile-summary.png" alt="Desktop OpenAI profile summary" />
+      <p><strong>OpenAI profile summary</strong></p>
+    </td>
+    <td width="50%">
+      <img src="docs/screenshots/desktop/follower-growth-chart.png" alt="Desktop Matplotlib follower growth chart" />
+      <p><strong>Follower growth chart</strong></p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <img src="docs/screenshots/desktop/follower-history-json.png" alt="Follower history JSON file" />
+      <p><strong>Saved follower history JSON</strong></p>
+    </td>
+    <td width="50%">
+      <p>The Tkinter app is the legacy local workflow. The web dashboard remains the primary experience for polished analytics, while the desktop tool is useful for direct local tracking and summaries.</p>
+    </td>
+  </tr>
+</table>
+
 ## Architecture
 
 ```mermaid
