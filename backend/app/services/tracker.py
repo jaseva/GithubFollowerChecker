@@ -1,7 +1,9 @@
 import os
 import sqlite3
+import time
 from datetime import datetime, timedelta, timezone
 from statistics import mean, median, pstdev
+from threading import Lock
 from typing import Any
 
 import requests
@@ -30,12 +32,21 @@ API_URL = "https://api.github.com"
 USERNAME = os.getenv("GITHUB_USERNAME")
 TOKEN = os.getenv("GITHUB_TOKEN")
 REQUEST_TIMEOUT = 20
+SQLITE_TIMEOUT_SECONDS = 30
+SQLITE_BUSY_TIMEOUT_MS = 30000
+SQLITE_WRITE_RETRY_ATTEMPTS = 3
+SQLITE_WRITE_RETRY_BASE_SECONDS = 0.2
 SYNC_INTERVAL_MINUTES = 5
 SNAPSHOT_INTERVAL_MINUTES = 30
 USER_CACHE_HOURS = 24
 FULL_HISTORY_DAYS = 30
 RECENT_WINDOW_HOURS = 24
 LEGACY_IMPORT_SOURCE = "legacy_desktop_db_v1"
+CHANGE_TABLES = {"new_followers", "lost_followers"}
+
+_DB_INIT_LOCK = Lock()
+_DB_INITIALIZED = False
+_SYNC_LOCK = Lock()
 
 
 def utcnow() -> datetime:
@@ -64,108 +75,125 @@ def build_headers() -> dict[str, str]:
 
 
 def get_connection() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=SQLITE_TIMEOUT_SECONDS)
+    conn.execute(f"PRAGMA busy_timeout = {SQLITE_BUSY_TIMEOUT_MS}")
     conn.row_factory = sqlite3.Row
     return conn
 
 
 def init_db() -> None:
     conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS followers (
-            count INTEGER,
-            timestamp TEXT
+    try:
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS followers (
+                count INTEGER,
+                timestamp TEXT
+            )
+            """
         )
-        """
-    )
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS new_followers (
-            username TEXT,
-            timestamp TEXT
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS new_followers (
+                username TEXT,
+                timestamp TEXT
+            )
+            """
         )
-        """
-    )
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS lost_followers (
-            username TEXT,
-            timestamp TEXT
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS lost_followers (
+                username TEXT,
+                timestamp TEXT
+            )
+            """
         )
-        """
-    )
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS current_followers (
-            username TEXT PRIMARY KEY
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS current_followers (
+                username TEXT PRIMARY KEY
+            )
+            """
         )
-        """
-    )
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS user_cache (
-            username TEXT PRIMARY KEY,
-            name TEXT,
-            avatar_url TEXT,
-            html_url TEXT,
-            bio TEXT,
-            public_repos INTEGER DEFAULT 0,
-            followers INTEGER DEFAULT 0,
-            following INTEGER DEFAULT 0,
-            company TEXT,
-            location TEXT,
-            created_at TEXT,
-            cached_at TEXT NOT NULL
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS user_cache (
+                username TEXT PRIMARY KEY,
+                name TEXT,
+                avatar_url TEXT,
+                html_url TEXT,
+                bio TEXT,
+                public_repos INTEGER DEFAULT 0,
+                followers INTEGER DEFAULT 0,
+                following INTEGER DEFAULT 0,
+                company TEXT,
+                location TEXT,
+                created_at TEXT,
+                cached_at TEXT NOT NULL
+            )
+            """
         )
-        """
-    )
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS sync_runs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp TEXT NOT NULL,
-            status TEXT NOT NULL,
-            error TEXT,
-            follower_count INTEGER,
-            new_count INTEGER DEFAULT 0,
-            lost_count INTEGER DEFAULT 0
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS sync_runs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL,
+                status TEXT NOT NULL,
+                error TEXT,
+                follower_count INTEGER,
+                new_count INTEGER DEFAULT 0,
+                lost_count INTEGER DEFAULT 0
+            )
+            """
         )
-        """
-    )
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS data_imports (
-            source TEXT PRIMARY KEY,
-            imported_at TEXT NOT NULL
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS data_imports (
+                source TEXT PRIMARY KEY,
+                imported_at TEXT NOT NULL
+            )
+            """
         )
-        """
-    )
-    cursor.execute(
-        "CREATE INDEX IF NOT EXISTS idx_followers_timestamp ON followers(timestamp)"
-    )
-    cursor.execute(
-        "CREATE UNIQUE INDEX IF NOT EXISTS idx_followers_unique_timestamp ON followers(timestamp)"
-    )
-    cursor.execute(
-        "CREATE INDEX IF NOT EXISTS idx_new_followers_timestamp ON new_followers(timestamp)"
-    )
-    cursor.execute(
-        "CREATE UNIQUE INDEX IF NOT EXISTS idx_new_followers_unique ON new_followers(username, timestamp)"
-    )
-    cursor.execute(
-        "CREATE INDEX IF NOT EXISTS idx_lost_followers_timestamp ON lost_followers(timestamp)"
-    )
-    cursor.execute(
-        "CREATE UNIQUE INDEX IF NOT EXISTS idx_lost_followers_unique ON lost_followers(username, timestamp)"
-    )
-    cursor.execute(
-        "CREATE INDEX IF NOT EXISTS idx_sync_runs_timestamp ON sync_runs(timestamp)"
-    )
-    import_legacy_data(conn)
-    conn.commit()
-    conn.close()
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_followers_timestamp ON followers(timestamp)"
+        )
+        cursor.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_followers_unique_timestamp ON followers(timestamp)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_new_followers_timestamp ON new_followers(timestamp)"
+        )
+        cursor.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_new_followers_unique ON new_followers(username, timestamp)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_lost_followers_timestamp ON lost_followers(timestamp)"
+        )
+        cursor.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_lost_followers_unique ON lost_followers(username, timestamp)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_sync_runs_timestamp ON sync_runs(timestamp)"
+        )
+        import_legacy_data(conn)
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def initialize_tracker_db() -> None:
+    global _DB_INITIALIZED
+
+    if _DB_INITIALIZED:
+        return
+
+    with _DB_INIT_LOCK:
+        if _DB_INITIALIZED:
+            return
+        init_db()
+        _DB_INITIALIZED = True
 
 
 def request_json(url: str) -> Any:
@@ -434,9 +462,6 @@ def replace_current_followers(conn: sqlite3.Connection, followers: set[str]) -> 
     )
 
 
-init_db()
-
-
 def latest_successful_sync(conn: sqlite3.Connection) -> sqlite3.Row | None:
     return conn.execute(
         "SELECT * FROM sync_runs WHERE status = 'success' ORDER BY timestamp DESC LIMIT 1"
@@ -469,18 +494,59 @@ def insert_snapshot(conn: sqlite3.Connection, count: int, timestamp: datetime) -
     )
 
 
-def sync_followers(*, force: bool = False) -> None:
-    conn = get_connection()
-    now = utcnow()
-    latest_success = latest_successful_sync(conn)
+def is_database_locked_error(exc: sqlite3.OperationalError) -> bool:
+    message = str(exc).lower()
+    return "database is locked" in message or "database table is locked" in message
 
-    if latest_success is not None and not force:
-        last_success = parse_datetime(latest_success["timestamp"])
-        if last_success and last_success >= now - timedelta(minutes=SYNC_INTERVAL_MINUTES):
-            conn.close()
-            return
+
+def successful_sync_since(timestamp: datetime) -> bool:
+    conn = get_connection()
+    try:
+        row = latest_successful_sync(conn)
+        if row is None:
+            return False
+        synced_at = parse_datetime(row["timestamp"])
+        return synced_at is not None and synced_at >= timestamp
+    finally:
+        conn.close()
+
+
+def sync_followers(*, force: bool = False) -> None:
+    initialize_tracker_db()
+    requested_at = utcnow()
+
+    with _SYNC_LOCK:
+        if force:
+            try:
+                if successful_sync_since(requested_at):
+                    return
+            except sqlite3.OperationalError as exc:
+                if not is_database_locked_error(exc):
+                    raise
+
+        for attempt in range(SQLITE_WRITE_RETRY_ATTEMPTS + 1):
+            try:
+                _sync_followers_once(force=force)
+                return
+            except sqlite3.OperationalError as exc:
+                if not is_database_locked_error(exc) or attempt >= SQLITE_WRITE_RETRY_ATTEMPTS:
+                    raise
+                time.sleep(SQLITE_WRITE_RETRY_BASE_SECONDS * (2**attempt))
+
+
+def _sync_followers_once(*, force: bool = False) -> None:
+    conn: sqlite3.Connection | None = None
+    now = utcnow()
 
     try:
+        conn = get_connection()
+        latest_success = latest_successful_sync(conn)
+
+        if latest_success is not None and not force:
+            last_success = parse_datetime(latest_success["timestamp"])
+            if last_success and last_success >= now - timedelta(minutes=SYNC_INTERVAL_MINUTES):
+                return
+
         profile_data = fetch_github_profile_json()
         upsert_user_cache(conn, profile_data)
 
@@ -521,11 +587,20 @@ def sync_followers(*, force: bool = False) -> None:
         )
         conn.commit()
     except Exception as exc:
-        record_sync_run(conn, status="failure", timestamp=now, error=str(exc))
-        conn.commit()
+        if conn is not None:
+            try:
+                conn.rollback()
+            except sqlite3.Error:
+                pass
+            try:
+                record_sync_run(conn, status="failure", timestamp=now, error=str(exc))
+                conn.commit()
+            except sqlite3.Error:
+                pass
         raise
     finally:
-        conn.close()
+        if conn is not None:
+            conn.close()
 
 
 def load_trends(conn: sqlite3.Connection) -> Trends:
@@ -550,6 +625,9 @@ def load_changes(
     *,
     since: datetime | None = None,
 ) -> list[sqlite3.Row]:
+    if table not in CHANGE_TABLES:
+        raise ValueError(f"Unsupported change table: {table}")
+
     query = f"SELECT username, timestamp FROM {table}"
     params: tuple[Any, ...] = ()
     if since is not None:
@@ -855,6 +933,8 @@ def fallback_profile(conn: sqlite3.Connection, trends: Trends) -> GitHubProfile:
 
 
 def get_dashboard_data(*, refresh: bool = False) -> DashboardData:
+    initialize_tracker_db()
+
     partial_data = False
     last_error = None
 
@@ -936,8 +1016,14 @@ def get_follower_trends(*, refresh: bool = False) -> Trends:
 
 
 def get_change_history(change_type: str, *, days: int = FULL_HISTORY_DAYS, refresh: bool = False) -> list[Change]:
+    if change_type == "new":
+        table = "new_followers"
+    elif change_type == "lost":
+        table = "lost_followers"
+    else:
+        raise ValueError("change_type must be 'new' or 'lost'")
+
     sync_followers(force=refresh)
-    table = "new_followers" if change_type == "new" else "lost_followers"
     since = utcnow() - timedelta(days=days)
 
     conn = get_connection()

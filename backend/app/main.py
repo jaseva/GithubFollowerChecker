@@ -1,13 +1,24 @@
 # app/main.py
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.ping import router as ping_router
 from app.api.stats import router as stats_router
+from app.services.tracker import initialize_tracker_db
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    initialize_tracker_db()
+    yield
 
 app = FastAPI(
     title="GitHub Follower Checker API",
-    version="0.1.0"
+    version="0.1.0",
+    lifespan=lifespan,
 )
 
 # Enable CORS for local Next.js dev servers. Next automatically falls back to
