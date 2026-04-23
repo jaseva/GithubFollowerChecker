@@ -1,0 +1,27 @@
+{
+  "include": [
+    "main.py",
+    "analytics.py",
+    "backend/app",
+    "dev/prototype/utils.py"
+  ],
+  "exclude": [
+    "**/.venv",
+    "**/node_modules",
+    "**/__pycache__",
+    "archive",
+    "dev/ClinicalTrialsGov",
+    "dev/openai",
+    "dev/python",
+    "dev/prototype/github_follower_checker.py"
+  ],
+  "executionEnvironments": [
+    {
+      "root": "backend",
+      "extraPaths": ["backend"]
+    },
+    {
+      "root": "."
+    }
+  ]
+}

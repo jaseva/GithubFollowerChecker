@@ -20,7 +20,6 @@ from openai import OpenAI
 from dotenv import load_dotenv
 import sys
 import logging
-from datetime import datetime
 import webbrowser
 
 # Set up logger for debugging and error tracking
@@ -60,6 +59,7 @@ def open_donation_link():
 
 # Function to track followers and who you follow that don't follow you back
 def track_followers(username, token, followers_file):
+    conn = None
     try:
         # Step 1: Establish connection to database
         conn = sqlite3.connect('follower_data.db')
@@ -147,20 +147,10 @@ def track_followers(username, token, followers_file):
         messagebox.showerror("Error", str(e))
 
     finally:
-        if conn:
+        if conn is not None:
             conn.close()  # ✅ Ensure database connection is always closed safely
 
     switch_tab(notebook, 0)  # Switch to "Followers" tab after generating summary
-
-
-    # Insert unfollowers into database
-    for unfollower in unfollowers:
-        cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO unfollowers (username, timestamp)
-            VALUES (?, ?)
-        ''', (unfollower, today))
-        conn.commit()
 
 # Function to start tracking in a separate thread
 def start_tracking():
@@ -263,7 +253,11 @@ def generate_summary(username, token):
         )
 
         # Extract and return summary using object attributes
-        summary = completion.choices[0].message.content.strip()
+        content = completion.choices[0].message.content
+        if not content:
+            raise ValueError("OpenAI returned an empty summary.")
+
+        summary = content.strip()
         return summary, profile_description, repos_contributed_to
 
     except Exception as e:
@@ -277,7 +271,11 @@ def generate_summary_wrapper():
     if not username or not token:
         messagebox.showwarning("Input Error", "Please enter username and token.")
         return
-    summary, profile_description, repos_contributed_to = generate_summary(username, token)
+    result = generate_summary(username, token)
+    if result is None:
+        return
+
+    summary, profile_description, repos_contributed_to = result
 
     if summary:
         
@@ -308,9 +306,8 @@ def generate_summary_wrapper():
         switch_tab(notebook, 1)  # Switch to "Profile Summary" tab after generating summary
 
 def switch_tab(notebook, index):
-     # Initialize selected_tab here
-    selected_tab = 0  # or any default value
-    
+    global selected_tab
+
     notebook.select(index)
     style.configure("TNotebook.Tab{}".format(index), background="blue", foreground="white")
     style.configure("TNotebook.Tab{}".format(selected_tab), background="gray", foreground="black")
@@ -359,10 +356,6 @@ style = ttk.Style()
 style.theme_use("default")
 style.configure("TNotebook.Tab", background="gray", foreground="black")
 
-# Add notebook to root
-notebook = ttk.Notebook(root)
-notebook.pack(expand=True, fill='both')
-
 # Increase window size to accommodate all elements
 root.geometry("1000x800")
 root.resizable(True, True)
@@ -400,18 +393,26 @@ username_label = tk.Label(left_column, text="GitHub Username:")
 username_label.pack(anchor="w")
 username_entry = tk.Entry(left_column)
 username_entry.pack(anchor="w")
+github_username = os.getenv("GITHUB_USERNAME")
+if github_username:
+    username_entry.insert(0, github_username)
 
 # Token input
 token_label = tk.Label(left_column, text="GitHub Token:")
 token_label.pack(anchor="w")
 token_entry = tk.Entry(left_column, show="*")
 token_entry.pack(anchor="w")
+github_token = os.getenv("GITHUB_TOKEN")
+if github_token:
+    token_entry.insert(0, github_token)
 
 # Follower file name input
 followers_file_label = tk.Label(left_column, text="Followers File:")
 followers_file_label.pack(anchor="w")
 followers_file_entry = tk.Entry(left_column)
 followers_file_entry.pack(anchor="w")
+if not followers_file_entry.get():
+    followers_file_entry.insert(0, "followers.json")
 
 # Profile entry input (right column)
 profile_label = tk.Label(right_column, text="Enter GitHub Profile:")
