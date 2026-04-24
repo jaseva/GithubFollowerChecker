@@ -1,12 +1,13 @@
 import { expect, test } from "@playwright/test";
 
 test.use({
-  channel: "msedge",
+  baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000",
+  channel: process.env.PLAYWRIGHT_BROWSER_CHANNEL || undefined,
   viewport: { width: 1980, height: 1250 },
 });
 
 test("Sprint 2 dashboard controls, insights, and query flow", async ({ page }) => {
-  await page.goto("http://localhost:3000", { waitUntil: "networkidle" });
+  await page.goto("/", { waitUntil: "networkidle" });
 
   await expect(page.getByText("GitHub Follower Intelligence")).toBeVisible();
 
