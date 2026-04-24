@@ -1,18 +1,19 @@
 "use client";
 
 import Image from "next/image";
-import { ArrowUpRight, Building2, CalendarDays, MapPin, Sparkles, Users, X } from "lucide-react";
+import { ArrowUpRight, Building2, CalendarDays, Download, FileJson, MapPin, Sparkles, Users, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import type { EnrichedChange } from "@/lib/api";
 
-type SortKey = "newest" | "oldest" | "signal" | "followers";
+type SortKey = "newest" | "oldest" | "signal" | "followers" | "repos";
 
 const sortOptions: Array<{ key: SortKey; label: string }> = [
   { key: "newest", label: "Newest" },
   { key: "oldest", label: "Oldest" },
   { key: "signal", label: "Signal" },
   { key: "followers", label: "Reach" },
+  { key: "repos", label: "Repos" },
 ];
 
 function formatTimestamp(value: string) {
@@ -24,6 +25,44 @@ function formatTimestamp(value: string) {
     hour: "numeric",
     minute: "2-digit",
   }).format(date);
+}
+
+function downloadFile(filename: string, content: string, type: string) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportDrawerCsv(title: string, items: EnrichedChange[]) {
+  const rows = [
+    ["username", "name", "timestamp", "followers", "public_repos", "signal_score", "signal_label", "profile_url"],
+    ...items.map((item) => [
+      item.username,
+      item.name ?? "",
+      item.timestamp,
+      String(item.followers),
+      String(item.public_repos),
+      String(item.signal_score),
+      item.signal_label,
+      item.html_url,
+    ]),
+  ];
+  const csv = rows
+    .map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(","))
+    .join("\n");
+  downloadFile(`${title.toLowerCase().replaceAll(" ", "-")}.csv`, csv, "text/csv;charset=utf-8");
+}
+
+function exportDrawerJson(title: string, items: EnrichedChange[]) {
+  downloadFile(
+    `${title.toLowerCase().replaceAll(" ", "-")}.json`,
+    JSON.stringify(items, null, 2),
+    "application/json;charset=utf-8",
+  );
 }
 
 export function ChangeDrawer({
@@ -84,6 +123,17 @@ export function ChangeDrawer({
                 {option.label}
               </button>
             ))}
+
+            <div className="ml-auto flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={() => exportDrawerCsv(title, items)}>
+                <Download className="mr-2 h-4 w-4" />
+                CSV
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => exportDrawerJson(title, items)}>
+                <FileJson className="mr-2 h-4 w-4" />
+                JSON
+              </Button>
+            </div>
           </div>
         </div>
 

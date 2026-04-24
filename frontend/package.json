@@ -8,7 +8,8 @@
     "kill:all": "powershell -ExecutionPolicy Bypass -File ..\\scripts\\kill-frontend.ps1 -Ports 3000 3001",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.0",
@@ -24,6 +25,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@playwright/test": "^1.59.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20.17.32",
     "@types/react": "^19.1.2",

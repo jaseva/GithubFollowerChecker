@@ -1,6 +1,7 @@
 "use client";
 
 import { Info } from "lucide-react";
+import { useMemo, useState } from "react";
 
 export type DashboardChartMode = "cumulative" | "delta";
 
@@ -127,6 +128,7 @@ export function ChartPanel({
   height?: number;
   note?: string | null;
 }) {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const chartHeight = height;
   const plotWidth = CHART_WIDTH - MARGIN.left - MARGIN.right;
   const plotHeight = chartHeight - MARGIN.top - MARGIN.bottom;
@@ -206,6 +208,16 @@ export function ChartPanel({
   const zeroY = mapY(0);
   const allCountsFlat = data.every((point) => point.currentCount === data[0]?.currentCount);
   const allDeltasFlat = data.every((point) => point.currentDelta === 0);
+  const annotationByX = useMemo(() => {
+    const map = new Map<number, DashboardChartAnnotation>();
+    for (const annotation of annotations) {
+      map.set(annotation.x, annotation);
+    }
+    return map;
+  }, [annotations]);
+  const hoveredPoint = hoveredIndex !== null ? data[hoveredIndex] : null;
+  const hoveredPlotPoint = hoveredIndex !== null ? currentPoints[hoveredIndex] : null;
+  const hoveredAnnotation = hoveredPoint ? annotationByX.get(hoveredPoint.x) : null;
 
   return (
     <div className="w-full">
@@ -218,12 +230,13 @@ export function ChartPanel({
         </div>
       )}
 
-      <div style={{ height }}>
+      <div className="relative" style={{ height }}>
         <svg
           viewBox={`0 0 ${CHART_WIDTH} ${chartHeight}`}
-          className="h-full w-full"
+          className="h-full w-full overflow-visible"
           role="img"
           aria-label={mode === "cumulative" ? "Follower count chart" : "Follower delta chart"}
+          onMouseLeave={() => setHoveredIndex(null)}
         >
         <defs>
           <linearGradient id="chartAreaFill" x1="0" y1="0" x2="0" y2="1">
@@ -234,7 +247,7 @@ export function ChartPanel({
 
         {yTicks.map((tick, index) => {
           const y = mapY(tick);
-          const label = Number.isInteger(tick) ? tick.toString() : tick.toFixed(1);
+          const label = Number.isInteger(tick) ? tick.toLocaleString() : tick.toFixed(1);
 
           return (
             <g key={`y-${index}`}>
@@ -351,20 +364,97 @@ export function ChartPanel({
           ))}
 
         {showAnnotations &&
-          annotations.map((annotation) => (
+          annotations.map((annotation, index) => {
+            const y = mapY(mode === "cumulative" ? annotation.value : (data.find((point) => point.x === annotation.x)?.currentDelta ?? 0));
+            const x = mapX(annotation.x);
+            const negative = annotation.kind === "dip" || annotation.kind === "loss";
+            return (
+              <g key={annotation.key}>
+                <circle
+                  cx={x}
+                  cy={y}
+                  r="5"
+                  fill={negative ? "#e11d48" : "#0f766e"}
+                  stroke="#fff"
+                  strokeWidth="2"
+                >
+                  <title>{`${annotation.label}: ${annotation.value.toLocaleString()}`}</title>
+                </circle>
+                {index < 4 && annotation.kind !== "gain" && annotation.kind !== "loss" && (
+                  <text
+                    x={Math.min(CHART_WIDTH - MARGIN.right - 84, Math.max(MARGIN.left + 8, x + 9))}
+                    y={Math.max(MARGIN.top + 12, y - 10)}
+                    fill={negative ? "#be123c" : "#0f766e"}
+                    fontSize="12"
+                    fontWeight="700"
+                  >
+                    {annotation.label}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+
+        {currentPoints.map((point, index) => {
+          const source = data[index];
+          const annotation = source ? annotationByX.get(source.x) : null;
+          const title = [
+            source?.tooltipLabel ?? point.label,
+            `Count: ${source?.currentCount.toLocaleString() ?? "Unknown"}`,
+            `Delta: ${source && source.currentDelta > 0 ? "+" : ""}${source?.currentDelta.toLocaleString() ?? "0"}`,
+            annotation ? `Event: ${annotation.label}` : null,
+          ].filter(Boolean).join("\n");
+
+          return (
             <circle
-              key={annotation.key}
-              cx={mapX(annotation.x)}
-              cy={mapY(mode === "cumulative" ? annotation.value : (data.find((point) => point.x === annotation.x)?.currentDelta ?? 0))}
-              r="5"
-              fill={annotation.kind === "dip" || annotation.kind === "loss" ? "#e11d48" : "#0f766e"}
-              stroke="#fff"
-              strokeWidth="2"
+              key={`hover-${index}`}
+              cx={point.x}
+              cy={point.y}
+              r="12"
+              fill="transparent"
+              onMouseEnter={() => setHoveredIndex(index)}
+              onMouseMove={() => setHoveredIndex(index)}
             >
-              <title>{`${annotation.label}: ${annotation.value.toLocaleString()}`}</title>
+              <title>{title}</title>
             </circle>
-          ))}
+          );
+        })}
         </svg>
+
+        {hoveredPoint && hoveredPlotPoint && (
+          <div
+            className="pointer-events-none absolute z-10 min-w-[220px] rounded-2xl border border-slate-200 bg-white/95 px-4 py-3 text-sm shadow-[0_18px_42px_-22px_rgba(15,23,42,0.45)] backdrop-blur"
+            style={{
+              left: `${(hoveredPlotPoint.x / CHART_WIDTH) * 100}%`,
+              top: `${(hoveredPlotPoint.y / chartHeight) * 100}%`,
+              transform: hoveredPlotPoint.x > CHART_WIDTH * 0.72 ? "translate(-100%, -110%)" : "translate(12px, -110%)",
+            }}
+          >
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{hoveredPoint.tooltipLabel}</p>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Followers</p>
+                <p className="text-base font-semibold text-slate-950">{hoveredPoint.currentCount.toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Delta</p>
+                <p className={`text-base font-semibold ${hoveredPoint.currentDelta < 0 ? "text-rose-700" : hoveredPoint.currentDelta > 0 ? "text-emerald-700" : "text-slate-700"}`}>
+                  {hoveredPoint.currentDelta > 0 ? "+" : ""}{hoveredPoint.currentDelta.toLocaleString()}
+                </p>
+              </div>
+            </div>
+            {hoveredPoint.compareCount !== null && (
+              <p className="mt-2 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-600">
+                Previous window: {hoveredPoint.compareCount.toLocaleString()}
+              </p>
+            )}
+            {hoveredAnnotation && (
+              <p className="mt-2 rounded-xl border border-teal-200 bg-teal-50 px-3 py-2 text-xs font-semibold text-teal-800">
+                {hoveredAnnotation.label}
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

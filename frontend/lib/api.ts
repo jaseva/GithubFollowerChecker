@@ -69,6 +69,16 @@ export interface DashboardHealth {
   expected_cadence_minutes: number | null;
   missed_snapshots: number;
   data_freshness_minutes: number | null;
+  recent_sync_runs: SyncRunSummary[];
+}
+
+export interface SyncRunSummary {
+  timestamp: string;
+  status: "success" | "failure";
+  follower_count: number | null;
+  new_count: number;
+  lost_count: number;
+  error: string | null;
 }
 
 export interface ChartAnnotation {
@@ -94,6 +104,43 @@ export interface DashboardData {
   annotations: ChartAnnotation[];
 }
 
+export type InsightRange = "24h" | "7d" | "30d";
+export type InsightMode = "brief" | "executive" | "technical";
+
+export interface InsightEvidence {
+  label: string;
+  value: string;
+  source: string;
+}
+
+export interface InsightResponse {
+  generated_at: string;
+  range: InsightRange;
+  mode: InsightMode;
+  window_start: string | null;
+  window_end: string | null;
+  headline: string;
+  summary: string;
+  bullets: string[];
+  evidence: InsightEvidence[];
+  recommended_actions: string[];
+  confidence: "high" | "medium" | "low";
+  stale: boolean;
+  data_warnings: string[];
+}
+
+export interface DashboardQueryResponse {
+  generated_at: string;
+  question: string;
+  interpreted_intent: string;
+  range: InsightRange;
+  answer: string;
+  evidence: InsightEvidence[];
+  recommended_next_action: string;
+  confidence: "high" | "medium" | "low";
+  data_warnings: string[];
+}
+
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
 
@@ -111,6 +158,41 @@ async function fetchJSON<T>(path: string): Promise<T> {
   return response.json();
 }
 
+async function postJSON<T>(path: string, body: unknown): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: "POST",
+    credentials: "include",
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const responseBody = await response.text().catch(() => "");
+    throw new Error(`Failed to load ${path}: ${response.status} ${responseBody}`);
+  }
+
+  return response.json();
+}
+
 export function getDashboard(refresh = false): Promise<DashboardData> {
   return fetchJSON<DashboardData>(`/stats/dashboard${refresh ? "?refresh=true" : ""}`);
+}
+
+export function getInsights(
+  range: InsightRange,
+  mode: InsightMode,
+  refresh = false,
+): Promise<InsightResponse> {
+  return postJSON<InsightResponse>("/stats/insights", { range, mode, refresh });
+}
+
+export function askDashboardQuestion(
+  question: string,
+  range: InsightRange,
+  refresh = false,
+): Promise<DashboardQueryResponse> {
+  return postJSON<DashboardQueryResponse>("/stats/query", { question, range, refresh });
 }

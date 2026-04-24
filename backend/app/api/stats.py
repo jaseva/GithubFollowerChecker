@@ -3,7 +3,18 @@ from typing import NoReturn
 
 from fastapi import APIRouter, HTTPException, Query
 
-from app.models import Change, DashboardData, GitHubProfile, Stats, Trends
+from app.models import (
+    Change,
+    DashboardData,
+    DashboardQueryRequest,
+    DashboardQueryResponse,
+    GitHubProfile,
+    InsightRequest,
+    InsightResponse,
+    Stats,
+    Trends,
+)
+from app.services.insights import answer_query, generate_insights
 from app.services.tracker import (
     get_change_history,
     get_dashboard_data,
@@ -66,3 +77,29 @@ def history(
         return get_change_history(change_type, days=days, refresh=refresh)
     except Exception as exc:
         _raise_service_error("Failed to load follower history.", exc)
+
+
+@router.post("/insights", response_model=InsightResponse)
+def insights(request: InsightRequest) -> InsightResponse:
+    try:
+        return generate_insights(
+            range_key=request.range,
+            mode=request.mode,
+            refresh=request.refresh,
+        )
+    except Exception as exc:
+        _raise_service_error("Failed to generate follower insights.", exc)
+
+
+@router.post("/query", response_model=DashboardQueryResponse)
+def query(request: DashboardQueryRequest) -> DashboardQueryResponse:
+    if not request.question.strip():
+        raise HTTPException(status_code=400, detail="question is required")
+    try:
+        return answer_query(
+            request.question.strip(),
+            range_key=request.range,
+            refresh=request.refresh,
+        )
+    except Exception as exc:
+        _raise_service_error("Failed to answer dashboard query.", exc)

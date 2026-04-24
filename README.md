@@ -25,16 +25,16 @@
 
 ## Why This Repo Stands Out
 
-- **A real analytics surface, not just a counter.** Track follower trends, 24-hour movement, churn, activity, and profile context in one view.
+- **A real analytics surface, not just a counter.** Track follower trends, 24-hour movement, churn, activity, profile context, and grounded insight narratives in one view.
 - **Two workflows in one repo.** Use the web dashboard for a modern product experience and the Tkinter app for local utility workflows.
 - **Practical data pipeline.** FastAPI backend, SQLite persistence, live GitHub API reads, and a responsive React frontend.
-- **Built for extension.** The current structure supports future notifications, richer timeline analysis, segmentation, and more advanced summaries.
+- **Built for extension.** The current structure supports future notifications, richer timeline analysis, segmentation, local natural-language querying, and explainable engineering-activity summaries.
 
 ## Choose Your Experience
 
 | Experience | Best For | Stack | What You Get |
 | --- | --- | --- | --- |
-| **Web dashboard** | Daily monitoring, demos, polished analytics | Next.js, React, Tailwind CSS, custom SVG charts, FastAPI | KPI cards, trend chart, follower activity, GitHub profile panel, signal quality panel |
+| **Web dashboard** | Daily monitoring, demos, polished analytics | Next.js, React, Tailwind CSS, custom SVG charts, FastAPI | KPI cards, trend chart, AI insights, dashboard query bar, follower investigation, GitHub profile panel, signal quality panel |
 | **Desktop utility** | Local automation, direct controls, quick tracking | Python, Tkinter, Matplotlib, OpenAI SDK | Follower tracking, follower file output, segmentation, charts, AI profile summaries |
 
 The recommended primary experience is the **web dashboard**.
@@ -49,6 +49,17 @@ The recommended primary experience is the **web dashboard**.
 - **Interactive follower growth chart**
   - 7-day, 30-day, and all-time ranges
   - Snapshot-based growth tracking
+  - Audience and delta modes
+  - Hover tooltip with timestamp, follower count, delta, comparison, and event annotations
+- **AI insights and local query layer**
+  - Brief, Executive, and Technical summaries
+  - 24-hour, 7-day, and 30-day insight windows
+  - Natural-language questions grounded in local dashboard data
+  - Evidence and recommended next actions returned with every generated answer
+- **Investigation workflow**
+  - New, lost, and high-signal follower drawers
+  - Sort by newest, oldest, signal, reach, or repository count
+  - Export filtered drawer data to CSV or JSON
 - **GitHub profile context**
   - Avatar
   - Bio
@@ -56,10 +67,12 @@ The recommended primary experience is the **web dashboard**.
   - Following count
   - Direct profile link
 - **Signal quality panel**
-  - Stability
-  - Monitoring window
-  - Data point count
-  - Last sync timestamp
+  - API health state
+  - Freshness and cadence
+  - Missed snapshots
+  - Snapshot count
+  - Partial data indicator
+  - Recent sync run summary
 - **Desktop utility workflows**
   - Local follower tracking
   - JSON history file output
@@ -138,6 +151,15 @@ The web app primarily reads from:
 
 - `GET /stats/dashboard`
 
+Sprint 2 intelligence endpoints:
+
+- `POST /stats/insights`
+  - Body: `{ "range": "24h" | "7d" | "30d", "mode": "brief" | "executive" | "technical", "refresh": false }`
+  - Returns a grounded narrative, evidence list, confidence, data warnings, and recommended actions.
+- `POST /stats/query`
+  - Body: `{ "question": "What changed this month?", "range": "30d", "refresh": false }`
+  - Returns an answer, interpreted intent, evidence, confidence, warnings, and next action.
+
 Supporting endpoints remain available:
 
 - `GET /stats/profile`
@@ -206,11 +228,12 @@ The desktop application remains part of the repo because it is useful for local 
 ```mermaid
 flowchart LR
     A[GitHub API] --> B[FastAPI Backend]
-    B --> C[(SQLite)]
-    B --> D[Next.js Dashboard]
-    A --> E[Tkinter Desktop Utility]
-    E --> F[(JSON + SQLite)]
-    E --> G[Matplotlib Charts]
+B --> C[(SQLite)]
+B --> D[Next.js Dashboard]
+B --> I[Grounded Insights + Query Service]
+A --> E[Tkinter Desktop Utility]
+E --> F[(JSON + SQLite)]
+E --> G[Matplotlib Charts]
     E --> H[OpenAI Summary]
 ```
 
@@ -266,6 +289,15 @@ npm run build
 npm run start
 ```
 
+Repeatable dashboard e2e verification:
+
+```sh
+cd frontend
+npm run test:e2e
+```
+
+The e2e test expects the backend on `http://127.0.0.1:8000` and the frontend on `http://localhost:3000`. It verifies range, chart mode, density, insights, query flow, and refreshes `docs/screenshots/dashboard.png` plus `docs/screenshots/dashboard-detail.png`.
+
 Type and compile checks:
 
 ```sh
@@ -302,6 +334,29 @@ If Playwright needs Chromium installed:
 ```sh
 npx --yes playwright install chromium
 ```
+
+The committed e2e spec uses Microsoft Edge (`channel: "msedge"`) to avoid requiring a bundled Chromium install on Windows.
+
+## Engineering Activity Intelligence
+
+Sprint 2 includes only the architecture boundary for a future module named **Engineering Activity Intelligence**. This future module should produce explainable summaries from engineering activity signals, not employment decisioning.
+
+Potential signals:
+
+- PR throughput
+- Review responsiveness
+- Issue participation
+- Commit cadence
+- Collaboration patterns
+- Repo ownership patterns
+
+Guardrails:
+
+- No compensation recommendations
+- No promotion or pay-raise scoring
+- No hidden employee ranking
+- No black-box score used for employment decisions
+- Summaries must be evidence-backed and inspectable
 
 ## Notes
 
