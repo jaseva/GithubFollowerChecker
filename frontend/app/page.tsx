@@ -30,17 +30,20 @@ import {
 
 import { ChartPanel, type DashboardChartAnnotation, type DashboardChartMode, type DashboardChartPoint } from "@/components/dashboard/chart-panel";
 import { ChangeDrawer } from "@/components/dashboard/change-drawer";
+import { InsightsPanel } from "@/components/dashboard/insights-panel";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { DashboardSkeleton } from "@/components/dashboard/loading";
+import { ProfileSummaryControl } from "@/components/dashboard/profile-summary-control";
+import { QueryPanel } from "@/components/dashboard/query-panel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import type { DashboardData, EnrichedChange } from "@/lib/api";
-import { getDashboard } from "@/lib/api";
+import type { DashboardData, DashboardQueryResponse, EnrichedChange, InsightMode, InsightRange, InsightResponse } from "@/lib/api";
+import { askDashboardQuestion, getDashboard, getInsights } from "@/lib/api";
 
 type RangeKey = "7d" | "30d" | "all";
 type DensityKey = "comfortable" | "compact";
 type DrawerView = "new" | "lost" | "high-signal" | null;
-type SortKey = "newest" | "oldest" | "signal" | "followers";
+type SortKey = "newest" | "oldest" | "signal" | "followers" | "repos";
 
 type RawPoint = {
   raw: Date;
@@ -167,6 +170,9 @@ function sortChanges(items: EnrichedChange[], sort: SortKey) {
     if (sort === "followers") {
       return right.followers - left.followers || right.signal_score - left.signal_score;
     }
+    if (sort === "repos") {
+      return right.public_repos - left.public_repos || right.signal_score - left.signal_score;
+    }
     return new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime();
   });
 }
@@ -271,6 +277,15 @@ export default function Home() {
   const [density, setDensity] = useLocalStorageState<DensityKey>("ghfc-density", "comfortable");
   const [showAnnotations, setShowAnnotations] = useLocalStorageState<boolean>("ghfc-annotations", true);
   const [drawerSort, setDrawerSort] = useLocalStorageState<SortKey>("ghfc-drawer-sort", "newest");
+  const [insightRange, setInsightRange] = useLocalStorageState<InsightRange>("ghfc-insight-range", "30d");
+  const [insightMode, setInsightMode] = useLocalStorageState<InsightMode>("ghfc-insight-mode", "brief");
+  const [insightCache, setInsightCache] = useState<Record<string, InsightResponse>>({});
+  const [insightLoading, setInsightLoading] = useState(false);
+  const [insightError, setInsightError] = useState<string | null>(null);
+  const [question, setQuestion] = useState("What changed this month?");
+  const [queryResponse, setQueryResponse] = useState<DashboardQueryResponse | null>(null);
+  const [queryLoading, setQueryLoading] = useState(false);
+  const [queryError, setQueryError] = useState<string | null>(null);
 
   const loadDashboard = useCallback(async (refresh: boolean) => {
     setRequestError(null);
@@ -286,9 +301,63 @@ export default function Home() {
     }
   }, []);
 
+  const loadInsight = useCallback(async (refresh = false, rangeOverride?: InsightRange, modeOverride?: InsightMode) => {
+    const nextRange = rangeOverride ?? insightRange;
+    const nextMode = modeOverride ?? insightMode;
+    const cacheKey = `${nextRange}:${nextMode}`;
+
+    if (!refresh && insightCache[cacheKey]) {
+      setInsightError(null);
+      return;
+    }
+
+    setInsightLoading(true);
+    setInsightError(null);
+
+    try {
+      const next = await getInsights(nextRange, nextMode, refresh);
+      setInsightCache((current) => ({
+        ...current,
+        [cacheKey]: next,
+      }));
+    } catch (error) {
+      setInsightError(error instanceof Error ? error.message : "Insights are unavailable.");
+    } finally {
+      setInsightLoading(false);
+    }
+  }, [insightCache, insightMode, insightRange]);
+
+  const askQuestion = useCallback(async (questionOverride?: string) => {
+    const nextQuestion = questionOverride ?? question;
+    if (!nextQuestion.trim()) return;
+
+    setQuestion(nextQuestion);
+    setQueryLoading(true);
+    setQueryError(null);
+
+    try {
+      const next = await askDashboardQuestion(nextQuestion.trim(), insightRange);
+      setQueryResponse(next);
+    } catch (error) {
+      setQueryError(error instanceof Error ? error.message : "Dashboard query is unavailable.");
+    } finally {
+      setQueryLoading(false);
+    }
+  }, [insightRange, question]);
+
   useEffect(() => {
     void loadDashboard(false);
   }, [loadDashboard]);
+
+  useEffect(() => {
+    const nextRange: InsightRange = range === "7d" ? "7d" : "30d";
+    setInsightRange(nextRange);
+  }, [range, setInsightRange]);
+
+  useEffect(() => {
+    if (!dashboard) return;
+    void loadInsight(false);
+  }, [dashboard, insightMode, insightRange, loadInsight]);
 
   const rawPoints = useMemo<RawPoint[]>(() => {
     if (!dashboard) return [];
@@ -519,6 +588,7 @@ export default function Home() {
           { label: "Average delta", value: signedNumber(Math.round(averageDelta * 10) / 10) },
           { label: "Flat snaps", value: numberFormatter.format(flatSnapshots) },
         ];
+  const activeInsight = insightCache[`${insightRange}:${insightMode}`] ?? null;
 
   const insightLines = useMemo(() => {
     if (!dashboard) return [];
@@ -734,9 +804,19 @@ export default function Home() {
             />
           </section>
 
-          <section className={`grid gap-4 ${sidebarWidth}`}>
-            <div className="grid gap-4">
-              <Card className="overflow-hidden border-white/70 bg-white/90 shadow-[0_20px_45px_-30px_rgba(15,23,42,0.55)] backdrop-blur-sm">
+          <QueryPanel
+            question={question}
+            range={insightRange}
+            response={queryResponse}
+            loading={queryLoading}
+            error={queryError}
+            onQuestionChange={setQuestion}
+            onAsk={(nextQuestion) => void askQuestion(nextQuestion)}
+          />
+
+          <section data-testid="dashboard-investigation-grid" className={`grid gap-4 ${sidebarWidth}`}>
+            <div className="grid content-start gap-4">
+              <Card data-testid="chart-card" className="overflow-hidden border-white/70 bg-white/90 shadow-[0_20px_45px_-30px_rgba(15,23,42,0.55)] backdrop-blur-sm">
                 <CardHeader className="border-b border-slate-100 pb-5">
                   <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                     <div>
@@ -845,6 +925,8 @@ export default function Home() {
 
                   {profile.bio && <p className={profileBioClass}>{profile.bio}</p>}
 
+                  <ProfileSummaryControl profile={profile} eventType="profile" compact className="mt-4" />
+
                   <div className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4">
                     <MetricTile label="Repositories" value={numberFormatter.format(profile.public_repos)} />
                     <MetricTile label="Following" value={numberFormatter.format(profile.following)} />
@@ -870,11 +952,48 @@ export default function Home() {
                   <QualityRow icon={RefreshCw} label="Cadence" value={health.expected_cadence_minutes ? `${health.expected_cadence_minutes} min` : "Adaptive"} />
                   <QualityRow icon={BarChart3} label="Missed snapshots" value={numberFormatter.format(health.missed_snapshots)} />
                   <QualityRow icon={LayoutGrid} label="Snapshot count" value={numberFormatter.format(health.snapshot_count)} />
+                  <QualityRow icon={AlertTriangle} label="Partial data" value={health.partial_data ? "Yes" : "No"} />
                   <QualityRow
                     icon={CheckCircle2}
                     label="Last success"
-                    value={health.last_successful_sync ? formatShortDate(new Date(health.last_successful_sync)) : "Pending"}
+                    value={health.last_successful_sync ? formatFullDate(new Date(health.last_successful_sync)) : "Pending"}
                   />
+                  <QualityRow
+                    icon={AlertTriangle}
+                    label="Last failure"
+                    value={health.last_failed_sync ? formatFullDate(new Date(health.last_failed_sync)) : "None recorded"}
+                  />
+                  <div className="rounded-2xl border border-slate-100 bg-slate-50/70 px-4 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-semibold text-slate-950">Recent sync runs</p>
+                      <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        {health.recent_sync_runs.length} runs
+                      </span>
+                    </div>
+                    <div className="mt-3 grid gap-2">
+                      {health.recent_sync_runs.slice(0, 4).map((run) => (
+                        <div
+                          key={`${run.timestamp}-${run.status}`}
+                          className={`rounded-xl border px-3 py-2 text-xs ${
+                            run.status === "success"
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                              : "border-rose-200 bg-rose-50 text-rose-800"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-semibold">{run.status}</span>
+                            <span>{formatShortDate(new Date(run.timestamp))}</span>
+                          </div>
+                          <p className="mt-1 text-[11px] opacity-80">
+                            {run.follower_count !== null ? `${numberFormatter.format(run.follower_count)} followers` : "No count"} · +{run.new_count} / -{run.lost_count}
+                          </p>
+                        </div>
+                      ))}
+                      {health.recent_sync_runs.length === 0 && (
+                        <p className="text-sm text-slate-500">No sync runs have been recorded yet.</p>
+                      )}
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
 
@@ -890,21 +1009,29 @@ export default function Home() {
                 </CardHeader>
                 <CardContent className="space-y-3 px-6 pb-6">
                   {rankedNewFollowers.slice(0, 3).map((item) => (
-                    <button
+                    <article
                       key={`${item.username}-${item.timestamp}`}
-                      type="button"
-                      onClick={() => setDrawer("high-signal")}
-                      className="flex w-full items-center justify-between rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-left transition hover:bg-emerald-100"
+                      className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3"
                     >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-slate-950">{item.name || item.username}</p>
-                        <p className="truncate text-xs text-slate-600">@{item.username}</p>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-slate-950">{item.name || item.username}</p>
+                          <p className="truncate text-xs text-slate-600">@{item.username}</p>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <p className="text-sm font-semibold text-emerald-700">{item.signal_score.toFixed(0)}</p>
+                          <p className="text-xs text-slate-600">{item.followers.toLocaleString()} reach</p>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm font-semibold text-emerald-700">{item.signal_score.toFixed(0)}</p>
-                        <p className="text-xs text-slate-600">{item.followers.toLocaleString()} reach</p>
+
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <ProfileSummaryControl profile={item} eventType="high-signal" compact />
+                        <Button variant="ghost" size="sm" onClick={() => setDrawer("high-signal")} className="h-8 rounded-full px-3 text-xs">
+                          Inspect
+                          <ChevronRight className="ml-1.5 h-3.5 w-3.5" />
+                        </Button>
                       </div>
-                    </button>
+                    </article>
                   ))}
 
                   {rankedNewFollowers.length === 0 && (
@@ -921,6 +1048,17 @@ export default function Home() {
               </Card>
             </aside>
           </section>
+
+          <InsightsPanel
+            insight={activeInsight}
+            mode={insightMode}
+            range={insightRange}
+            loading={insightLoading}
+            error={insightError}
+            onModeChange={setInsightMode}
+            onRangeChange={setInsightRange}
+            onGenerate={(refresh) => void loadInsight(refresh)}
+          />
 
           <Card className="border-white/70 bg-white/90 shadow-[0_20px_45px_-30px_rgba(15,23,42,0.55)] backdrop-blur-sm">
             <CardHeader className="pb-4">
@@ -1106,22 +1244,30 @@ function ActivityCard({
         ) : (
           <div className="space-y-3">
             {items.map((item) => (
-              <button
+              <article
                 key={`${item.username}-${item.timestamp}`}
-                type="button"
-                onClick={onOpen}
-                className="flex w-full items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3 text-left transition hover:bg-slate-100"
+                className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3"
               >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-slate-950">{item.name || item.username}</p>
-                  <p className="truncate text-xs text-slate-500">
-                    @{item.username} • {formatFullDate(new Date(item.timestamp))}
-                  </p>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-950">{item.name || item.username}</p>
+                    <p className="truncate text-xs text-slate-500">
+                      @{item.username} • {formatFullDate(new Date(item.timestamp))}
+                    </p>
+                  </div>
+                  <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${toneClasses}`}>
+                    {item.signal_label}
+                  </span>
                 </div>
-                <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${toneClasses}`}>
-                  {item.signal_label}
-                </span>
-              </button>
+
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <ProfileSummaryControl profile={item} eventType={tone} compact />
+                  <Button variant="ghost" size="sm" onClick={onOpen} className="h-8 rounded-full px-3 text-xs">
+                    Inspect
+                    <ChevronRight className="ml-1.5 h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </article>
             ))}
           </div>
         )}

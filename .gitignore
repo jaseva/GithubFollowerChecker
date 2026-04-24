@@ -22,13 +22,18 @@ backend/.env.*
 # SQLite DB (if stored locally)
 *.sqlite3
 *.db
+*.db-shm
+*.db-wal
 
 # Frontend Node project
 frontend/node_modules/
 frontend/.next/
 frontend/out/
+frontend/test-results/
+frontend/playwright-report/
 frontend/.env.local
 frontend/.env*
+test-results/
 
 # System files
 .DS_Store

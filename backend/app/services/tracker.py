@@ -18,6 +18,7 @@ from app.models import (
     EnrichedChange,
     GitHubProfile,
     Stats,
+    SyncRunSummary,
     Trends,
 )
 
@@ -766,6 +767,35 @@ def cadence_minutes(trends: Trends) -> tuple[int | None, int]:
     return expected, missed
 
 
+def load_recent_sync_runs(conn: sqlite3.Connection, limit: int = 5) -> list[SyncRunSummary]:
+    rows = conn.execute(
+        """
+        SELECT timestamp, status, error, follower_count, new_count, lost_count
+        FROM sync_runs
+        ORDER BY timestamp DESC
+        LIMIT ?
+        """,
+        (limit,),
+    ).fetchall()
+
+    runs: list[SyncRunSummary] = []
+    for row in rows:
+        parsed = parse_datetime(row["timestamp"])
+        if parsed is None:
+            continue
+        runs.append(
+            SyncRunSummary(
+                timestamp=parsed,
+                status=row["status"],
+                follower_count=row["follower_count"],
+                new_count=int(row["new_count"] or 0),
+                lost_count=int(row["lost_count"] or 0),
+                error=row["error"],
+            )
+        )
+    return runs
+
+
 def compute_metrics(
     profile: GitHubProfile,
     trends: Trends,
@@ -825,6 +855,7 @@ def compute_health(
         stale = freshness_minutes > max(threshold, 90)
 
     last_error = last_error_override or (failure_row["error"] if failure_row else None)
+    recent_sync_runs = load_recent_sync_runs(conn)
     if not trends.labels and last_error:
         api_status = "error"
     elif partial_data or stale or last_error:
@@ -843,6 +874,7 @@ def compute_health(
         expected_cadence_minutes=expected_cadence,
         missed_snapshots=missed_snapshots,
         data_freshness_minutes=freshness_minutes,
+        recent_sync_runs=recent_sync_runs,
     )
 
 
@@ -1043,7 +1075,8 @@ def get_change_history(change_type: str, *, days: int = FULL_HISTORY_DAYS, refre
     else:
         raise ValueError("change_type must be 'new' or 'lost'")
 
-    sync_followers(force=refresh)
+    if refresh or not has_cached_dashboard_data():
+        sync_followers(force=refresh)
     since = utcnow() - timedelta(days=days)
 
     conn = get_connection()
