@@ -66,6 +66,7 @@ The recommended primary experience is the **web dashboard**.
   - Public repositories
   - Following count
   - Direct profile link
+  - Per-profile summaries from cached dashboard data
 - **Signal quality panel**
   - API health state
   - Freshness and cadence
@@ -91,7 +92,7 @@ GITHUB_TOKEN=your-github-token
 OPENAI_API_KEY=your-openai-api-key
 ```
 
-`OPENAI_API_KEY` is optional and only required for the desktop profile summary workflow.
+`OPENAI_API_KEY` is optional. When present, the web profile `Summarize` action reuses the desktop app's OpenAI profile-summary pattern with `gpt-4o-mini`; otherwise it falls back to a local grounded summary. Set `PROFILE_SUMMARY_PROVIDER=local` to force the local fallback, or `OPENAI_PROFILE_SUMMARY_MODEL` to change the OpenAI model.
 
 The backend supports `backend/.env` as a local override if you want to keep web-dashboard credentials separate.
 
@@ -159,6 +160,9 @@ Sprint 2 intelligence endpoints:
 - `POST /stats/query`
   - Body: `{ "question": "What changed this month?", "range": "30d", "refresh": false }`
   - Returns an answer, interpreted intent, evidence, confidence, warnings, and next action.
+- `POST /stats/profile-summary`
+  - Body: `{ "profile": { "username": "octocat", "...": "visible cached fields" }, "event_type": "new" | "lost" | "high-signal" | "profile", "prefer_ai": true }`
+  - Returns a grounded per-profile summary, evidence, confidence, source (`openai` or `local`), warnings, and recommended next action.
 
 Supporting endpoints remain available:
 

@@ -33,6 +33,7 @@ import { ChangeDrawer } from "@/components/dashboard/change-drawer";
 import { InsightsPanel } from "@/components/dashboard/insights-panel";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { DashboardSkeleton } from "@/components/dashboard/loading";
+import { ProfileSummaryControl } from "@/components/dashboard/profile-summary-control";
 import { QueryPanel } from "@/components/dashboard/query-panel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -924,6 +925,8 @@ export default function Home() {
 
                   {profile.bio && <p className={profileBioClass}>{profile.bio}</p>}
 
+                  <ProfileSummaryControl profile={profile} eventType="profile" compact className="mt-4" />
+
                   <div className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-100 pt-4">
                     <MetricTile label="Repositories" value={numberFormatter.format(profile.public_repos)} />
                     <MetricTile label="Following" value={numberFormatter.format(profile.following)} />
@@ -1006,21 +1009,29 @@ export default function Home() {
                 </CardHeader>
                 <CardContent className="space-y-3 px-6 pb-6">
                   {rankedNewFollowers.slice(0, 3).map((item) => (
-                    <button
+                    <article
                       key={`${item.username}-${item.timestamp}`}
-                      type="button"
-                      onClick={() => setDrawer("high-signal")}
-                      className="flex w-full items-center justify-between rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-left transition hover:bg-emerald-100"
+                      className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3"
                     >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-slate-950">{item.name || item.username}</p>
-                        <p className="truncate text-xs text-slate-600">@{item.username}</p>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-slate-950">{item.name || item.username}</p>
+                          <p className="truncate text-xs text-slate-600">@{item.username}</p>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <p className="text-sm font-semibold text-emerald-700">{item.signal_score.toFixed(0)}</p>
+                          <p className="text-xs text-slate-600">{item.followers.toLocaleString()} reach</p>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm font-semibold text-emerald-700">{item.signal_score.toFixed(0)}</p>
-                        <p className="text-xs text-slate-600">{item.followers.toLocaleString()} reach</p>
+
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <ProfileSummaryControl profile={item} eventType="high-signal" compact />
+                        <Button variant="ghost" size="sm" onClick={() => setDrawer("high-signal")} className="h-8 rounded-full px-3 text-xs">
+                          Inspect
+                          <ChevronRight className="ml-1.5 h-3.5 w-3.5" />
+                        </Button>
                       </div>
-                    </button>
+                    </article>
                   ))}
 
                   {rankedNewFollowers.length === 0 && (
@@ -1233,22 +1244,30 @@ function ActivityCard({
         ) : (
           <div className="space-y-3">
             {items.map((item) => (
-              <button
+              <article
                 key={`${item.username}-${item.timestamp}`}
-                type="button"
-                onClick={onOpen}
-                className="flex w-full items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3 text-left transition hover:bg-slate-100"
+                className="rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3"
               >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-slate-950">{item.name || item.username}</p>
-                  <p className="truncate text-xs text-slate-500">
-                    @{item.username} • {formatFullDate(new Date(item.timestamp))}
-                  </p>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-950">{item.name || item.username}</p>
+                    <p className="truncate text-xs text-slate-500">
+                      @{item.username} • {formatFullDate(new Date(item.timestamp))}
+                    </p>
+                  </div>
+                  <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${toneClasses}`}>
+                    {item.signal_label}
+                  </span>
                 </div>
-                <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${toneClasses}`}>
-                  {item.signal_label}
-                </span>
-              </button>
+
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <ProfileSummaryControl profile={item} eventType={tone} compact />
+                  <Button variant="ghost" size="sm" onClick={onOpen} className="h-8 rounded-full px-3 text-xs">
+                    Inspect
+                    <ChevronRight className="ml-1.5 h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </article>
             ))}
           </div>
         )}

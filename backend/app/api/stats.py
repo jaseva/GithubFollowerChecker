@@ -11,10 +11,12 @@ from app.models import (
     GitHubProfile,
     InsightRequest,
     InsightResponse,
+    ProfileSummaryRequest,
+    ProfileSummaryResponse,
     Stats,
     Trends,
 )
-from app.services.insights import answer_query, generate_insights
+from app.services.insights import answer_query, generate_insights, summarize_profile
 from app.services.tracker import (
     get_change_history,
     get_dashboard_data,
@@ -103,3 +105,13 @@ def query(request: DashboardQueryRequest) -> DashboardQueryResponse:
         )
     except Exception as exc:
         _raise_service_error("Failed to answer dashboard query.", exc)
+
+
+@router.post("/profile-summary", response_model=ProfileSummaryResponse)
+def profile_summary(request: ProfileSummaryRequest) -> ProfileSummaryResponse:
+    if not request.profile.username.strip():
+        raise HTTPException(status_code=400, detail="username is required")
+    try:
+        return summarize_profile(request)
+    except Exception as exc:
+        _raise_service_error("Failed to summarize profile.", exc)

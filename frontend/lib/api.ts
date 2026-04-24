@@ -141,6 +141,41 @@ export interface DashboardQueryResponse {
   data_warnings: string[];
 }
 
+export type ProfileSummaryContext = "new" | "lost" | "high-signal" | "profile";
+
+export interface ProfileSummarySubject {
+  username: string;
+  name?: string | null;
+  avatar_url?: string | null;
+  html_url?: string | null;
+  bio?: string | null;
+  public_repos?: number;
+  followers?: number;
+  following?: number;
+  company?: string | null;
+  location?: string | null;
+  created_at?: string | null;
+  timestamp?: string | null;
+  signal_score?: number | null;
+  signal_label?: string | null;
+  repository_names?: string[];
+}
+
+export interface ProfileSummaryResponse {
+  generated_at: string;
+  username: string;
+  event_type: ProfileSummaryContext;
+  summary_source: "openai" | "local";
+  model: string | null;
+  headline: string;
+  summary: string;
+  bullets: string[];
+  evidence: InsightEvidence[];
+  recommended_next_action: string;
+  confidence: "high" | "medium" | "low";
+  data_warnings: string[];
+}
+
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
 
@@ -195,4 +230,16 @@ export function askDashboardQuestion(
   refresh = false,
 ): Promise<DashboardQueryResponse> {
   return postJSON<DashboardQueryResponse>("/stats/query", { question, range, refresh });
+}
+
+export function summarizeProfile(
+  profile: ProfileSummarySubject,
+  eventType: ProfileSummaryContext = "profile",
+  preferAi = true,
+): Promise<ProfileSummaryResponse> {
+  return postJSON<ProfileSummaryResponse>("/stats/profile-summary", {
+    profile,
+    event_type: eventType,
+    prefer_ai: preferAi,
+  });
 }

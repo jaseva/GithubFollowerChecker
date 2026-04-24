@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { ArrowUpRight, Building2, CalendarDays, Download, FileJson, MapPin, Sparkles, Users, X } from "lucide-react";
 
+import { ProfileSummaryControl } from "@/components/dashboard/profile-summary-control";
 import { Button } from "@/components/ui/button";
 import type { EnrichedChange } from "@/lib/api";
 
@@ -91,6 +92,7 @@ export function ChangeDrawer({
     rose: "border-rose-200 bg-rose-50 text-rose-700",
     sky: "border-sky-200 bg-sky-50 text-sky-700",
   };
+  const summaryContext = tone === "rose" ? "lost" : tone === "sky" ? "high-signal" : "new";
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/40 backdrop-blur-sm">
@@ -200,6 +202,13 @@ export function ChangeDrawer({
                       </div>
 
                       {item.bio && <p className="mt-3 text-sm leading-6 text-slate-600">{item.bio}</p>}
+
+                      <ProfileSummaryControl
+                        profile={item}
+                        eventType={summaryContext}
+                        compact
+                        className="mt-3"
+                      />
 
                       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500">
                         <span className="inline-flex items-center gap-1.5">

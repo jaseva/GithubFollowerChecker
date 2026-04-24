@@ -12,7 +12,12 @@ from app.models import (
     InsightMode,
     InsightRange,
     InsightResponse,
+    ProfileSummaryContext,
+    ProfileSummaryRequest,
+    ProfileSummaryResponse,
+    ProfileSummarySubject,
 )
+from app.services.profile_summarizer import generate_desktop_style_openai_summary
 from app.services.tracker import get_dashboard_data, utcnow
 
 
@@ -400,5 +405,177 @@ def answer_query(question: str, *, range_key: InsightRange = "30d", refresh: boo
         evidence=evidence[:8],
         recommended_next_action=action,
         confidence=confidence_for(context, dashboard),
+        data_warnings=warnings,
+    )
+
+
+def profile_summary_confidence(profile: ProfileSummarySubject) -> Literal["high", "medium", "low"]:
+    populated_fields = sum(
+        1
+        for value in [
+            profile.bio,
+            profile.company,
+            profile.location,
+            profile.created_at,
+            profile.signal_score,
+        ]
+        if value not in (None, "")
+    )
+    if populated_fields >= 3 and (profile.followers > 0 or profile.public_repos > 0):
+        return "high"
+    if populated_fields >= 1 or profile.followers > 0 or profile.public_repos > 0:
+        return "medium"
+    return "low"
+
+
+def profile_persona(profile: ProfileSummarySubject) -> str:
+    bio = (profile.bio or "").lower()
+    if any(term in bio for term in ["founder", "ceo", "cto"]):
+        return "founder or leadership-oriented GitHub profile"
+    if any(term in bio for term in ["engineer", "developer", "software", "full stack", "frontend", "backend", "react", "python"]):
+        return "developer or engineering-oriented GitHub profile"
+    if any(term in bio for term in ["student", "university", "college", "learner"]):
+        return "student or learning-oriented GitHub profile"
+    if profile.public_repos >= 100:
+        return "repository-active GitHub profile"
+    if profile.followers >= 1000:
+        return "high-reach GitHub profile"
+    return "general GitHub profile"
+
+
+def reach_label(profile: ProfileSummarySubject) -> str:
+    if profile.followers >= 1000:
+        return "large visible reach"
+    if profile.followers >= 100:
+        return "moderate visible reach"
+    if profile.followers > 0:
+        return "limited visible reach"
+    return "unknown visible reach"
+
+
+def activity_label(profile: ProfileSummarySubject) -> str:
+    if profile.public_repos >= 100:
+        return "very high public repository surface"
+    if profile.public_repos >= 25:
+        return "active public repository surface"
+    if profile.public_repos > 0:
+        return "light public repository surface"
+    return "no public repository signal in the cached profile"
+
+
+def event_label(event_type: ProfileSummaryContext) -> str:
+    return {
+        "new": "new follower",
+        "lost": "lost follower",
+        "high-signal": "high-signal follower",
+        "profile": "profile",
+    }[event_type]
+
+
+def profile_summary_evidence(profile: ProfileSummarySubject) -> list[InsightEvidence]:
+    evidence = [
+        InsightEvidence(label="Followers", value=f"{profile.followers:,}", source="profile.followers"),
+        InsightEvidence(label="Following", value=f"{profile.following:,}", source="profile.following"),
+        InsightEvidence(label="Public repositories", value=f"{profile.public_repos:,}", source="profile.public_repos"),
+    ]
+    if profile.signal_score is not None:
+        label = profile.signal_label or "Signal"
+        evidence.append(
+            InsightEvidence(
+                label="Signal",
+                value=f"{label} {profile.signal_score:.0f}",
+                source="profile.signal_score",
+            )
+        )
+    if profile.bio:
+        evidence.append(InsightEvidence(label="Bio present", value="Yes", source="profile.bio"))
+    if profile.company:
+        evidence.append(InsightEvidence(label="Company", value=profile.company, source="profile.company"))
+    if profile.location:
+        evidence.append(InsightEvidence(label="Location", value=profile.location, source="profile.location"))
+    if profile.timestamp:
+        evidence.append(
+            InsightEvidence(
+                label="Event timestamp",
+                value=profile.timestamp.strftime("%b %d, %Y"),
+                source="profile.timestamp",
+            )
+        )
+    return evidence
+
+
+def profile_recommended_action(profile: ProfileSummarySubject, event_type: ProfileSummaryContext) -> str:
+    high_signal = (profile.signal_score or 0) >= 70
+    high_reach = profile.followers >= 500
+    repo_active = profile.public_repos >= 50
+
+    if event_type == "lost":
+        return "Compare this lost follower against the churn window and annotations before treating it as a meaningful relationship signal."
+    if high_signal or high_reach or repo_active:
+        return "Open the GitHub profile and review recent public work manually before deciding whether to engage."
+    if profile.bio or profile.company or profile.location:
+        return "Keep this profile in the investigation set if the bio or organization context matches your audience goals."
+    return "Treat this as a low-context profile until a refresh or manual review adds more evidence."
+
+
+def summarize_profile(request: ProfileSummaryRequest) -> ProfileSummaryResponse:
+    profile = request.profile
+    display_name = profile.name or profile.username
+    persona = profile_persona(profile)
+    event = event_label(request.event_type)
+    confidence = profile_summary_confidence(profile)
+    ai_summary = generate_desktop_style_openai_summary(profile, prefer_ai=request.prefer_ai)
+
+    headline = f"@{profile.username} is a {persona} in the {event} context."
+    summary = (
+        f"{display_name} has {reach_label(profile)} with {profile.followers:,} followers and "
+        f"{activity_label(profile)} across {profile.public_repos:,} public repos."
+    )
+    if profile.bio:
+        summary += " The visible bio is the strongest qualitative clue in the cached profile."
+    if profile.signal_score is not None:
+        summary += f" The local signal model marks this profile at {profile.signal_score:.0f}."
+
+    bullets = [
+        f"Reach: {profile.followers:,} followers and {profile.following:,} following.",
+        f"Repository surface: {profile.public_repos:,} public repos.",
+    ]
+    if profile.company:
+        bullets.append(f"Organization clue: {profile.company}.")
+    if profile.location:
+        bullets.append(f"Location clue: {profile.location}.")
+    if profile.created_at:
+        bullets.append(f"Account age signal: created {profile.created_at.strftime('%b %d, %Y')}.")
+    if profile.timestamp:
+        bullets.append(f"Follower event recorded {profile.timestamp.strftime('%b %d, %Y')}.")
+    if not profile.bio:
+        bullets.append("No cached bio is available, so qualitative interpretation is limited.")
+
+    summary_source: Literal["openai", "local"] = "local"
+    model: str | None = None
+    warnings = ["This summary uses only cached dashboard profile fields."]
+    if ai_summary is not None:
+        summary_source = "openai"
+        model = ai_summary.model
+        headline = f"Desktop-style OpenAI profile summary for @{profile.username}."
+        summary = ai_summary.text
+        warnings = ["Generated with the same OpenAI profile-summary pattern used by the desktop app, constrained to cached dashboard fields."]
+    elif request.prefer_ai:
+        warnings.append("OpenAI profile summarization was unavailable, so the local grounded fallback was used.")
+    if confidence == "low":
+        warnings.append("Low confidence because the cached profile has limited enrichment.")
+
+    return ProfileSummaryResponse(
+        generated_at=utcnow(),
+        username=profile.username,
+        event_type=request.event_type,
+        summary_source=summary_source,
+        model=model,
+        headline=headline,
+        summary=summary,
+        bullets=bullets[:5],
+        evidence=profile_summary_evidence(profile)[:8],
+        recommended_next_action=profile_recommended_action(profile, request.event_type),
+        confidence=confidence,
         data_warnings=warnings,
     )

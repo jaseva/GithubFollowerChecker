@@ -32,6 +32,9 @@ test("Sprint 2 dashboard controls, insights, and query flow", async ({ page }) =
   await expect(page.getByText("Evidence").first()).toBeVisible();
   await expect(page.getByText("Building a data-grounded summary")).toBeHidden({ timeout: 30000 });
 
+  await page.getByRole("button", { name: /Summarize @/ }).first().click();
+  await expect(page.getByTestId("profile-summary-result").first()).toBeVisible({ timeout: 30000 });
+
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: "../docs/screenshots/dashboard.png", fullPage: true });
 

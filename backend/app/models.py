@@ -158,3 +158,45 @@ class DashboardQueryResponse(BaseModel):
     recommended_next_action: str
     confidence: Literal["high", "medium", "low"]
     data_warnings: list[str] = Field(default_factory=list)
+
+
+ProfileSummaryContext = Literal["new", "lost", "high-signal", "profile"]
+
+
+class ProfileSummarySubject(BaseModel):
+    username: str
+    name: str | None = None
+    avatar_url: str | None = None
+    html_url: str | None = None
+    bio: str | None = None
+    public_repos: int = 0
+    followers: int = 0
+    following: int = 0
+    company: str | None = None
+    location: str | None = None
+    created_at: datetime | None = None
+    timestamp: datetime | None = None
+    signal_score: float | None = None
+    signal_label: str | None = None
+    repository_names: list[str] = Field(default_factory=list)
+
+
+class ProfileSummaryRequest(BaseModel):
+    profile: ProfileSummarySubject
+    event_type: ProfileSummaryContext = "profile"
+    prefer_ai: bool = True
+
+
+class ProfileSummaryResponse(BaseModel):
+    generated_at: datetime
+    username: str
+    event_type: ProfileSummaryContext
+    summary_source: Literal["openai", "local"]
+    model: str | None = None
+    headline: str
+    summary: str
+    bullets: list[str]
+    evidence: list[InsightEvidence]
+    recommended_next_action: str
+    confidence: Literal["high", "medium", "low"]
+    data_warnings: list[str] = Field(default_factory=list)
